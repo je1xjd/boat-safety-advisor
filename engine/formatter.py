@@ -22,11 +22,10 @@ class StatusUIConfig:
 
     @staticmethod
     def get_style(status: str) -> dict:
-        """ステータスに応じたスタイル情報を取得。tide_lowはdangerに統合"""
-        # tide_low は正規化により danger に統合されるため、定義から除外して危険として扱う
-        if status == "tide_low":
-            return StatusUIConfig.MAPPING["danger"]
-        return StatusUIConfig.MAPPING.get(status, {"color": "#000000", "label": "不明"})
+        """ステータスに応じたスタイル情報を取得。"""
+        # tide_lowはdangerとして扱う
+        target = "danger" if status == "tide_low" else status
+        return StatusUIConfig.MAPPING.get(target, {"color": "#000000", "label": "不明"})
 
 class TideFormatter:
     """潮汐情報の表示用テキスト整形"""
@@ -165,17 +164,16 @@ class ReportFormatter:
 
     @staticmethod
     def build_display_rows(table_rows: list) -> list[UIRow]:
-        """dictリストをUIRowリストに変換"""
-        rows = []
-        for row in table_rows:
-            # ここで全てのフィールドに値を割り当てます
-            rows.append(UIRow(
-                time_range=f"{row['hour']:02d}-{row['hour'] + 1:02d}",
-                status=row["status"],
-                direction=row["direction"],
-                wind=row["wind_text"],
-                wave=row["wave_text"],
-                tide=row["tide_text"],
-                tag=row.get("tag", "normal") # 安全のため get を使用
-            ))
-        return rows
+        """dictリストをUIRowオブジェクトのリストに変換する。"""
+        return [
+            UIRow(
+                time_range=f"{r['hour']:02d}-{r['hour'] + 1:02d}",
+                status=r["status"],
+                direction=r["direction"],
+                wind=r["wind_text"],
+                wave=r["wave_text"],
+                tide=r["tide_text"],
+                tag=r.get("tag", "normal")
+            )
+            for r in table_rows
+        ]

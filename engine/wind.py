@@ -1,17 +1,16 @@
 from .rules import SafetyRule
 
 class WindJudge:
-    """風に関する判定を専門に行うクラス"""
+    """風に関する判定を担当するクラス"""
 
     @staticmethod
     def degrees_to_direction(deg: float) -> str:
-        """風向の角度（度）を16方位の日本語表記に変換します。"""
+        """風向（度）を16方位の文字列に変換する"""
         directions = [
             "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東",
             "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"
         ]
         return directions[int((deg + 11.25) / 22.5) % 16]
-
 
     @staticmethod
     def is_south_wind(wind_dir: float) -> bool:
@@ -27,13 +26,15 @@ class WindJudge:
 
     @staticmethod
     def is_safe(wind_speed: float, limit: float, wave_height: float) -> bool:
-        # 風速上限判定
-        if wind_speed > limit:
-            # 例外許可判定
-            if (
-                wind_speed <= (limit + SafetyRule.WIND_OVERRIDE_MARGIN)
-                and wave_height < SafetyRule.WIND_OVERRIDE_WAVE_HEIGHT
-            ):
-                return True
-            return False
-        return True
+        # 風速が上限以下の場合は安全
+        if wind_speed <= limit:
+            return True
+
+        # 上限を超えていても例外許可条件を満たせば安全
+        if (
+            wind_speed <= limit + SafetyRule.WIND_OVERRIDE_MARGIN and
+            wave_height < SafetyRule.WIND_OVERRIDE_WAVE_HEIGHT
+        ):
+            return True
+
+        return False

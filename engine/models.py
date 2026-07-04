@@ -48,14 +48,14 @@ class HourForecast:
         return "danger"
 
     def is_tide_low(self) -> bool:
-        """潮位が基準値未満か判定する"""
-        return self.tide is not None and self.tide < SafetyRule.MIN_TIDE_CM
+        """潮位が基準値未満か判定する。"""
+        return (self.tide or 0) < SafetyRule.MIN_TIDE_CM
 
 @dataclass(frozen=True)
 class AnalysisSummary:
-    """総合判定結果を保持するデータクラス"""
+    """総合判定結果を保持するデータクラス。"""
     is_available: bool
-    best_window: tuple  # (start, end, duration)
+    best_window: tuple[int, int, int]
     before_str: str
     after_str: str
 

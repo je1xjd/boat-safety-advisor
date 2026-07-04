@@ -14,23 +14,23 @@ class TideJudge:
         all_events.sort(key=lambda x: x[0])
         
         last_event_type = None
+
+        # 直近の潮汐イベントを取得
         for event_time, event_type in all_events:
-            if event_time <= current_minutes:
-                last_event_type = event_type
-            else:
+            if event_time > current_minutes:
                 break
-                
+            last_event_type = event_type
+            
         if last_event_type is None:
+            # イベント前の時間は、最初のイベントがhighならlowから開始とみなす
             last_event_type = "low" if all_events[0][1] == "high" else "high"
             
         return last_event_type == "high"
 
     @staticmethod
     def is_tide_safe(tide_cm: float | None) -> bool:
-        """潮位が安全基準を満たしているか"""
-        if tide_cm is None:
-            return False
-        return tide_cm >= SafetyRule.MIN_TIDE_CM
+        """潮位が安全基準を満たしているか判定する。"""
+        return tide_cm is not None and tide_cm >= SafetyRule.MIN_TIDE_CM
 
     @staticmethod
     def is_tide_low(tide_cm: float | None) -> bool:

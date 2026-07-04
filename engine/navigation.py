@@ -1,6 +1,5 @@
 from .models import HourForecast, AnalysisSummary
 from .rules import SafetyRule
-from .evaluators import WindWaveEvaluator, WaveJudge
 from .tide import TideJudge
 from .wind import WindJudge
 from .engine import BoatSafetyEngine
@@ -27,11 +26,8 @@ class NavigationAnalyzer:
         hour_data = {}
 
         for hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
-
-            if hour >= max_len:
-                continue
-
-            if hour >= len(tide_data):
+            # データの範囲外の場合はスキップ
+            if hour >= max_len or hour >= len(tide_data):
                 continue
 
             wind_speed = weather_info.wind_speed[hour]

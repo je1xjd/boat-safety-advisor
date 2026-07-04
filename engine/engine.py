@@ -13,41 +13,26 @@ class BoatSafetyEngine:
         wave_height: float | None, swell_period: float | None,
         high_tides: list[int], low_tides: list[int]
     ) -> bool:
-        """風速・風向・沿岸波浪・長周期うねり等の気象海象条件を基準値に基づき単独判定します。"""
-        
-        # インポート確認用デバッグ
-        try:
-            # WindJudgeが存在するかテスト
-            from engine.wind import WindJudge
-        except ImportError as e:
+        """風速・風向・沿岸波浪・うねり条件に基づき単独判定する。"""
+        from engine.wind import WindJudge
+
+        if any(v is None for v in [wind_speed, wind_dir, wave_height, swell_period]):
             return False
 
-        if wind_speed is None or wind_dir is None or wave_height is None or swell_period is None:
-            return False
-
-        # 1. 波・うねりの物理判定
+        # 物理判定
         if not WaveJudge.is_physically_safe(wave_height, swell_period):
             return False
-
-        # 2. 複合危険判定
         if not WaveJudge.is_complex_safe(wave_height, swell_period):
             return False
 
-        # 3. 運用制約・風速判定
-        try:
-            is_south = WindJudge.is_south_wind(wind_dir)
-            is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
-            
-            limit_wave = SafetyRule.MAX_WAVE_HEIGHT_STRICT if (is_south or is_ebb) else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
-            is_under_operational_limit = wave_height <= limit_wave
-
-            limit = WindJudge.get_limit(is_ebb, is_south, is_under_operational_limit)
-            result = WindJudge.is_safe(wind_speed, limit, wave_height)
-            
-            return result
-        except NameError as e:
-            raise e
-
+        # 運用判定
+        is_south = WindJudge.is_south_wind(wind_dir)
+        is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
+        
+        limit_wave = SafetyRule.MAX_WAVE_HEIGHT_STRICT if (is_south or is_ebb) else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
+        
+        limit = WindJudge.get_limit(is_ebb, is_south, wave_height <= limit_wave)
+        return WindJudge.is_safe(wind_speed, limit, wave_height)
 
     @classmethod
     def judge_safety(cls, hour, wind_speed, wind_dir, wave_height, swell_period, tide_val, high_tides, low_tides) -> bool:
@@ -99,36 +84,19 @@ class BoatSafetyEngine:
         return valid_windows, before_candidates, after_candidates
 
 
-
-
     @classmethod
     def get_display_status(cls, hour: int, data: object, sunrise_hour: int, sunset_hour: int) -> tuple[str, str]:
-        """
-        時間外・安全性・潮位判定を一元管理する。
-        戻り値: (表示ラベル, タグ)
-        """
-        # 1. 時間外判定 (最優先)
+        """時間外・安全性・潮位判定を一元管理する。"""
         if not (sunrise_hour <= hour < sunset_hour):
-            label = "日没" if hour >= sunset_hour else "夜明"
-            return label, "danger"
+            return ("日没" if hour >= sunset_hour else "夜明"), "danger"
 
-        # 2. 安全判定
         if data.is_safe:
             return "安全", "safe"
         
-        # 3. 潮位判定
         if getattr(data, 'is_tide_warning', False):
             return "潮位", "tide_low"
             
-        # 4. その他（物理的危険・座礁リスク）
         return "危険", "danger"
-
-
-
-
-
-
-
 
 
     @classmethod
@@ -162,12 +130,6 @@ class BoatSafetyEngine:
             return (0, 0, 0)
 
         return max(valid_windows, key=lambda x: x[2])
-
-
-
-
-
-
 
 
     @staticmethod

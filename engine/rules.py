@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SafetyRule:
-    """海況判定の基準値を管理する設定クラス"""
-    
+    """海況判定の基準値を一元管理する定数クラス。"""
+
     # 地理座標
     LATITUDE: float = 35.316
     LONGITUDE: float = 139.370
@@ -14,8 +14,6 @@ class SafetyRule:
     # 波浪制限
     MAX_WAVE_HEIGHT_NORMAL: float = 1.0
     MAX_WAVE_HEIGHT_STRICT: float = 0.8
-
-    # うねり制限
     MAX_SWELL_PERIOD: float = 12.0
     MAX_COMBINED_SWELL_PERIOD: float = 10.0
     MAX_COMBINED_WAVE_HEIGHT: float = 0.7
@@ -31,17 +29,15 @@ class SafetyRule:
     ACTIVITY_END_HOUR: int = 18
     REQUIRED_SAFE_HOURS: int = 3
 
-    # 風速制限 (m/秒)
+    # 風速制限 (m/s)
     WIND_LIMIT_CRITICAL: float = 5.5
     WIND_LIMIT_EBB: float = 7.0
     WIND_LIMIT_SOUTH: float = 7.5
     WIND_LIMIT_NORMAL: float = 9.0
-
-    # 風速超過時の例外許可条件
     WIND_OVERRIDE_MARGIN: float = 1.0
     WIND_OVERRIDE_WAVE_HEIGHT: float = 0.4
 
-    # 外部データソース参照先
+    # 外部データソース
     TIDE_STATION_CODE: str = "D8"
     JMA_TIDE_BASE_URL: str = "https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt"
     UMITENKI_BASE_URL: str = "https://www.umitenki.jp/tenki/1545/14days"
