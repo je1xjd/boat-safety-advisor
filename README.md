@@ -18,7 +18,7 @@
 python main.py
 ```
 
-Web版（準備中）
+Web版
 
 ```bash
 streamlit run streamlit_app.py
