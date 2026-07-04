@@ -1,19 +1,20 @@
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 import re
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, date
+from typing import Any
+
 import requests
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
-# --- engine層の全モジュールを明示的に読み込む ---
-from engine import AnalysisResult, AnalysisSummary, WeatherReport, UmiInfo
-from engine import SafetyRule
-from engine import BoatSafetyEngine
-from engine import TideJudge 
-from engine import NavigationAnalyzer
-from engine import WindWaveEvaluator, WindJudge, WaveJudge
+# engine層のモジュール
+from engine import (
+    AnalysisResult, BoatSafetyEngine, NavigationAnalyzer,
+    SafetyRule, TideJudge, UmiInfo, WeatherReport,
+    WaveJudge, WindJudge, WindWaveEvaluator
+)
 
 from .weather import WeatherAPI
 from .scraper import WeatherScraper
@@ -29,16 +30,16 @@ class MarineWeatherClient:
 # 1. セッションを保持する変数を用意
     _session = None
 
-    @staticmethod
-    def get_session():
+    @classmethod
+    def get_session(cls) -> requests.Session:
         """シングルトンセッションを取得する"""
-        if MarineWeatherClient._session is None:
-            MarineWeatherClient._session = MarineWeatherClient.create_robust_session()
-        return MarineWeatherClient._session
+        if cls._session is None:
+            cls._session = cls.create_robust_session()
+        return cls._session
 
 
     @staticmethod
-    def fetch_all_data(date_obj):
+    def fetch_all_data(date_obj: date) -> tuple[Any, Any, Any]:
         """API取得を並列実行して結果をまとめて返す"""
         date_str = date_obj.strftime("%Y-%m-%d")
         
