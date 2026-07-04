@@ -1,16 +1,15 @@
+import sys
+import os
+
+# プロジェクトのルートディレクトリ（uiフォルダの一つ上の階層）をシステムパスに追加
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# --- 以下の既存のインポートを記述 ---
 import datetime
 import pandas as pd
 import streamlit as st
 
-from engine import (
-    AnalysisResult, AnalysisSummary, BoatSafetyEngine,
-    NavigationAnalyzer, StatusFormatter
-)
-from engine.formatter import (
-    ReportFormatter, SafetyReportFormatter,
-    TideFormatter
-)
-from engine.utils import SunCalculator, summarize_daytime_weather
+# --- サービス層 ---
 from services.service import BoatDataService
 
 # --- 新しいエンジン層から個別にインポート ---
@@ -282,13 +281,9 @@ table_rows = SafetyReportFormatter.build_table_rows(
     sunset_hour
 )
 
-# 2. 辞書リストを UI用のクラスリスト (UIRow) に変換
-# ※ NavigationAnalyzer ではなく ReportFormatter を使用
+# ReportFormatterで直接DataFrame生成または変換を完結させるのが理想だが、
+# ロジックを変えないため、辞書リストへの変換を整理
 display_rows = ReportFormatter.build_display_rows(table_rows)
-
-# 3. Pandas 用に辞書形式へ戻すか、直接 DataFrame に変換
-# (UIRow は dataclass なので、asdict を使うと綺麗です)
-from dataclasses import asdict
 df = pd.DataFrame([asdict(row) for row in display_rows])
 
 # 4. 列名を適切な日本語にマッピング
