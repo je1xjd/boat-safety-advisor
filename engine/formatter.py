@@ -117,9 +117,9 @@ class SafetyReportFormatter:
             "status": status,
             "tag": tag,
             "direction": data.dir_kanji,
-            "wind_text": f"{data.wind_speed:.1f} m/秒" if data.wind_speed is not None else "取得失敗",
+            "wind_text": f"{data.wind_speed:.1f} m/s" if data.wind_speed is not None else "取得失敗",
             "wave_text": (
-                f"{data.wave_height:.2f}m / {data.swell_period:.1f}秒"
+                f"{data.wave_height:.2f}m / {data.swell_period:.1f}s"
                 if data.wave_height is not None and data.swell_period is not None
                 else "取得失敗"
             ),
@@ -170,7 +170,7 @@ class ReportFormatter:
         for row in table_rows:
             # ここで全てのフィールドに値を割り当てます
             rows.append(UIRow(
-                time_range=f"{row['hour']:02d}:00-{row['hour'] + 1:02d}:00",
+                time_range=f"{row['hour']:02d}-{row['hour'] + 1:02d}",
                 status=row["status"],
                 direction=row["direction"],
                 wind=row["wind_text"],

@@ -114,14 +114,14 @@ class BoatSafetyEngine:
 
         # 2. 安全判定
         if data.is_safe:
-            return "○ 安全", "safe"
+            return "安全", "safe"
         
         # 3. 潮位判定
         if getattr(data, 'is_tide_warning', False):
-            return "△ 潮位", "tide_low"
+            return "潮位", "tide_low"
             
         # 4. その他（物理的危険・座礁リスク）
-        return "× 危険", "danger"
+        return "危険", "danger"
 
 
 
