@@ -7,8 +7,8 @@ class WindJudge:
     def degrees_to_direction(deg: float) -> str:
         """風向の角度（度）を16方位の日本語表記に変換します。"""
         directions = [
-            "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
+            "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東",
+            "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"
         ]
         return directions[int((deg + 11.25) / 22.5) % 16]
 
