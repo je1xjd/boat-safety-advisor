@@ -1,8 +1,8 @@
 from .models import UmiInfo, HourForecast, AnalysisResult, AnalysisSummary
 from .rules import SafetyRule
 from .tide import TideJudge
-from .evaluators import WindWaveEvaluator
 from .wave import WaveJudge
+from .evaluators import WindWaveEvaluator
 
 class BoatSafetyEngine:
     """相模川河口海域における固有の気象・海象リスクを多角的に評価する判定エンジン。"""
@@ -13,8 +13,15 @@ class BoatSafetyEngine:
         wave_height: float | None, swell_period: float | None,
         high_tides: list[int], low_tides: list[int]
     ) -> bool:
-
         """風速・風向・沿岸波浪・長周期うねり等の気象海象条件を基準値に基づき単独判定します。"""
+        
+        # インポート確認用デバッグ
+        try:
+            # WindJudgeが存在するかテスト
+            from engine.wind import WindJudge
+        except ImportError as e:
+            return False
+
         if wind_speed is None or wind_dir is None or wave_height is None or swell_period is None:
             return False
 
@@ -27,15 +34,19 @@ class BoatSafetyEngine:
             return False
 
         # 3. 運用制約・風速判定
-        is_south = WindJudge.is_south_wind(wind_dir)
-        is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
-        
-        limit_wave = SafetyRule.MAX_WAVE_HEIGHT_STRICT if (is_south or is_ebb) else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
-        is_under_operational_limit = wave_height <= limit_wave
+        try:
+            is_south = WindJudge.is_south_wind(wind_dir)
+            is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
+            
+            limit_wave = SafetyRule.MAX_WAVE_HEIGHT_STRICT if (is_south or is_ebb) else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
+            is_under_operational_limit = wave_height <= limit_wave
 
-        limit = WindJudge.get_limit(is_ebb, is_south, is_under_operational_limit)
-        
-        return WindJudge.is_safe(wind_speed, limit, wave_height)
+            limit = WindJudge.get_limit(is_ebb, is_south, is_under_operational_limit)
+            result = WindJudge.is_safe(wind_speed, limit, wave_height)
+            
+            return result
+        except NameError as e:
+            raise e
 
 
     @classmethod
@@ -55,81 +66,32 @@ class BoatSafetyEngine:
 
     @classmethod
     def calculate_valid_windows(cls, hour_data: dict) -> tuple[list, list, list]:
-
-        status_map = {}
-
-        for hour in range(
-            SafetyRule.ACTIVITY_START_HOUR,
-            SafetyRule.ACTIVITY_END_HOUR
-        ):
-
-            if hour not in hour_data:
-                continue
-
-            data = hour_data[hour]
-
-            # 辞書アクセスを属性アクセスに変更
-            if data.is_safe:
-
-                status_map[hour] = "safe"
-
-            elif (
-                data.wind_wave_safe
-                and data.tide is not None
-                and data.tide < SafetyRule.MIN_TIDE_CM
-            ):
-
-                status_map[hour] = "tide_low"
-
-            else:
-
-                status_map[hour] = "danger"
-
-        status_map = cls.normalize_status_sequence(
-            status_map
-        )
-
         valid_windows = []
-
-        for start_hour in range(
-            SafetyRule.ACTIVITY_START_HOUR,
-            SafetyRule.ACTIVITY_END_HOUR
-        ):
+        
+        for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
             for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS - 1, SafetyRule.ACTIVITY_END_HOUR):
-                all_safe = True
+                all_navigable = True
+                
                 for h in range(start_hour, end_hour + 1):
-
-                    if h not in status_map:
-                        all_safe = False
+                    is_ok = h in hour_data and hour_data[h].is_navigable
+                    if not is_ok:
+                        all_navigable = False
                         break
-
-                    if status_map[h] == "danger":
-                        all_safe = False
-                        break
-                if all_safe:
+                
+                if all_navigable:
                     duration = end_hour - start_hour + 1
                     valid_windows.append((start_hour, end_hour + 1, duration))
-
-        low_hours = [
-            h
-            for h, status in status_map.items()
-            if status == "tide_low"
-        ]
-
+        
+        # ... (残りの処理)
+        # 前半/後半の候補抽出 (潮位低下区間との位置関係)
+        # 潮位が MIN_TIDE_CM 未満になる時間を特定し、その前後でフィルタリングする
+        low_hours = [h for h, data in hour_data.items() if data.is_tide_low()]
+    
         if low_hours:
-
             first_low = min(low_hours)
             last_low = max(low_hours)
-
-            before_candidates = [
-                w for w in valid_windows
-                if w[1] <= first_low
-            ]
-
-            after_candidates = [
-                w for w in valid_windows
-                if w[0] > last_low
-            ]
+            before_candidates = [w for w in valid_windows if w[1] <= first_low]
+            after_candidates = [w for w in valid_windows if w[0] > last_low]
         else:
             before_candidates = valid_windows
             after_candidates = []
@@ -138,35 +100,6 @@ class BoatSafetyEngine:
 
 
 
-    @classmethod
-    def _normalize_tide_sequence(cls, status_map: dict) -> dict:
-        """
-        仕様: 
-        前後が両方 "safe" の場合にのみ "tide_low" を維持。
-        それ以外（片方でも danger や夜間など）は "danger" に格下げ。
-        """
-        normalized = status_map.copy()
-        hours = sorted(status_map.keys())
-
-        for i, hour in enumerate(hours):
-            if status_map[hour] != "tide_low":
-                continue
-
-            start = i
-            while i + 1 < len(hours) and status_map[hours[i + 1]] == "tide_low":
-                i += 1
-            end = i
-
-            # 前後の状態を取得（存在しない場合は危険とみなす）
-            prev_status = status_map.get(hours[start - 1], "danger") if start > 0 else "danger"
-            next_status = status_map.get(hours[end + 1], "danger") if end < len(hours) - 1 else "danger"
-
-            # 前後両方が safe でなければ danger に置換
-            if not (prev_status == "safe" and next_status == "safe"):
-                for j in range(start, end + 1):
-                    normalized[hours[j]] = "danger"
-        
-        return normalized
 
     @classmethod
     def get_display_status(cls, hour: int, data: object, sunrise_hour: int, sunset_hour: int) -> tuple[str, str]:
@@ -190,66 +123,6 @@ class BoatSafetyEngine:
         # 4. その他（物理的危険・座礁リスク）
         return "× 危険", "danger"
 
-
-    @classmethod
-    def normalize_status_sequence(
-        cls,
-        status_map: dict
-    ) -> dict:
-
-        hours = sorted(status_map.keys())
-
-        # --------------------------------------------------
-        # 潮位低下区間を抽出
-        # --------------------------------------------------
-
-        i = 0
-
-        while i < len(hours):
-
-            hour = hours[i]
-
-            if status_map[hour] != "tide_low":
-                i += 1
-                continue
-
-            start = i
-
-            while (
-                i + 1 < len(hours)
-                and status_map[hours[i + 1]] == "tide_low"
-            ):
-                i += 1
-
-            end = i
-
-            before_safe = False
-            after_safe = False
-
-            if start > 0:
-                before_safe = (
-                    status_map[hours[start - 1]]
-                    == "safe"
-                )
-
-            if end < len(hours) - 1:
-                after_safe = (
-                    status_map[hours[end + 1]]
-                    == "safe"
-                )
-
-            # --------------------------------------------------
-            # 前後とも安全でない潮位低下区間は危険へ変更
-            # --------------------------------------------------
-
-            if not (before_safe and after_safe):
-
-                for j in range(start, end + 1):
-                    status_map[hours[j]] = "danger"
-
-            i += 1
-
-        return status_map
 
 
 
@@ -377,23 +250,3 @@ class BoatSafetyEngine:
             return "tide_low"
         return "safe"
 
-    @classmethod
-    def normalize_status_sequence_standalone(cls, status_map: dict) -> dict:
-        """
-        [STEP 1 追加] 正規化専用メソッド
-        前後関係のルールを適用します
-        """
-        hours = sorted(status_map.keys())
-        new_map = status_map.copy()
-        for i, hour in enumerate(hours):
-            if new_map[hour] != "tide_low": continue
-            start = i
-            while i + 1 < len(hours) and new_map[hours[i + 1]] == "tide_low": i += 1
-            end = i
-            prev = new_map.get(hours[start - 1]) if start > 0 else "danger"
-            next = new_map.get(hours[end + 1]) if end < len(hours) - 1 else "danger"
-            
-            # 前後が両方 safe でなければ danger に置換
-            if not (prev == "safe" and next == "safe"):
-                for j in range(start, end + 1): new_map[hours[j]] = "danger"
-        return new_map
