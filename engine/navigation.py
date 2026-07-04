@@ -1,7 +1,8 @@
 from .models import HourForecast, AnalysisSummary
 from .rules import SafetyRule
-from .evaluators import WindWaveEvaluator, WindJudge, WaveJudge
+from .evaluators import WindWaveEvaluator, WaveJudge
 from .tide import TideJudge
+from .wind import WindJudge
 from .engine import BoatSafetyEngine
 
 class NavigationAnalyzer:
@@ -39,8 +40,8 @@ class NavigationAnalyzer:
             swell_period = weather_info.swell_period[hour]
             tide_val = tide_data[hour]
 
-            wind_wave_ok = BoatSafetyEngine.judge_safety(
-                hour, wind_speed, wind_dir, wave_height, swell_period, tide_val, high_tides, low_tides
+            wind_wave_ok = BoatSafetyEngine.judge_wind_wave_only(
+                hour, wind_speed, wind_dir, wave_height, swell_period, high_tides, low_tides
             )
 
             total_ok = BoatSafetyEngine.judge_safety(
