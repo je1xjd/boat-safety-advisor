@@ -1,23 +1,14 @@
+import datetime
 import logging
 import tkinter as tk
-import datetime
-
 from concurrent.futures import ThreadPoolExecutor
 from tkinter import messagebox, ttk
 
-from engine import AnalysisResult, AnalysisSummary
-from engine import SafetyRule
-from engine import BoatSafetyEngine
 from engine import (
-    SunCalculator, 
-    summarize_daytime_weather, 
-)
-
-from engine import (
-    TideFormatter, 
-    ReportFormatter, 
-    SafetyReportFormatter, 
-    StatusUIConfig
+    AnalysisResult, AnalysisSummary, BoatSafetyEngine,
+    ReportFormatter, SafetyReportFormatter, SafetyRule,
+    StatusUIConfig, SunCalculator, TideFormatter,
+    summarize_daytime_weather
 )
 from services.service import BoatDataService
 
@@ -146,25 +137,27 @@ class BoatSafetyApp:
 
     def on_click_check(self) -> None:
         """判定ボタン押下時のイベント: 非同期処理を開始する"""
-        raw_date_str = self.date_combobox.get()
-        if not raw_date_str:
+        if not (raw_date_str := self.date_combobox.get()):
             messagebox.showwarning("警告", "日付を選択してください。")
             return
 
         target_date_str = raw_date_str[:10]
-        
-        # 実行中は入力を一時的に無効化
-        self.submit_btn.config(state=tk.DISABLED, text="⏳ 解析処理中...")
-        self.weather_label.config(text="")
-        self.summary_label.config(text="")
-        self.tide_info_label.config(text="")
-        self.result_label.config(text="データオンライン取得中...", fg="orange")
-        for item in self.result_tree.get_children(): self.result_tree.delete(item)
+        self._reset_ui_state_for_loading()
         
         target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d").date()
         
         executor = ThreadPoolExecutor(max_workers=1)
         executor.submit(self._async_fetch_and_judge, target_date_str, target_date)
+
+    def _reset_ui_state_for_loading(self):
+        """UIの読み込み中状態をリセットする"""
+        self.submit_btn.config(state=tk.DISABLED, text="⏳ 解析処理中...")
+        self.weather_label.config(text="")
+        self.summary_label.config(text="")
+        self.tide_info_label.config(text="")
+        self.result_label.config(text="データオンライン取得中...", fg="orange")
+        for item in self.result_tree.get_children():
+            self.result_tree.delete(item)
 
     def _async_fetch_and_judge(self, target_date_str: str, target_date: datetime.date) -> None:
         """バックグラウンドで気象・潮汐データを取得し判定を計算する"""
