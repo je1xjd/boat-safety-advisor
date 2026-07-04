@@ -11,6 +11,8 @@ import streamlit as st
 
 # --- サービス層 ---
 from services.service import BoatDataService
+from dataclasses import asdict
+
 
 # --- 新しいエンジン層から個別にインポート ---
 from engine import AnalysisResult, AnalysisSummary
