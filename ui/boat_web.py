@@ -1,3 +1,10 @@
+import sys
+import os
+
+# プロジェクトのルートディレクトリ（uiフォルダの一つ上の階層）をシステムパスに追加
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# --- 以下の既存のインポートを記述 ---
 import datetime
 import pandas as pd
 import streamlit as st
@@ -12,7 +19,6 @@ from engine import BoatSafetyEngine
 from engine import NavigationAnalyzer
 from engine import StatusFormatter
 
-
 # --- 表示整形クラス ---
 from engine.formatter import (
     SafetyReportFormatter,
@@ -20,6 +26,7 @@ from engine.formatter import (
     ReportFormatter,
     TideFormatter
 )
+
 
 # --- まだ移動が済んでいない共通関数/クラス ---
 # これらは今後 engine/utils.py 等に移動予定ですが、
