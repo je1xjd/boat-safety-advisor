@@ -1,5 +1,3 @@
-import sys
-import os
 import datetime
 import pandas as pd
 import streamlit as st
@@ -14,7 +12,6 @@ from engine.formatter import (
 )
 from engine.utils import SunCalculator, summarize_daytime_weather
 from services.service import BoatDataService
-from dataclasses import asdict
 
 # --- 新しいエンジン層から個別にインポート ---
 from engine import AnalysisResult, AnalysisSummary
@@ -285,7 +282,13 @@ table_rows = SafetyReportFormatter.build_table_rows(
     sunset_hour
 )
 
+# 2. 辞書リストを UI用のクラスリスト (UIRow) に変換
+# ※ NavigationAnalyzer ではなく ReportFormatter を使用
 display_rows = ReportFormatter.build_display_rows(table_rows)
+
+# 3. Pandas 用に辞書形式へ戻すか、直接 DataFrame に変換
+# (UIRow は dataclass なので、asdict を使うと綺麗です)
+from dataclasses import asdict
 df = pd.DataFrame([asdict(row) for row in display_rows])
 
 # 4. 列名を適切な日本語にマッピング
