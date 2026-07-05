@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 # --- サービス層 ---
-from services.service import BoatDataService
+from services.analysis import BoatDataService
 from dataclasses import asdict
 
 
