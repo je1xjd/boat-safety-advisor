@@ -1,26 +1,22 @@
 """
-marine.py
+service.py
 
-外部APIおよびスクレイピングによる気象・海象・潮位データの統合取得サービス。
+外部サービスからのデータ取得と分析処理を仲介するサービスレイヤー。
 """
 
 import logging
-import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 from engine import (
-    AnalysisResult, BoatSafetyEngine, NavigationAnalyzer,
-    SafetyRule, TideJudge, UmiInfo, WeatherReport,
-    WaveJudge, WindJudge, WindWaveEvaluator
+    AnalysisResult, NavigationAnalyzer, SafetyRule,
+    TideJudge, UmiInfo, WeatherReport
 )
-
 from .weather import WeatherAPI
 from .scraper import WeatherScraper
 
@@ -28,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class MarineWeatherClient:
-    """外部ソースから海況データを取得・集約するクライアント。"""
+    """外部APIから気象・海象データを取得・統合するクライアント。"""
 
     _session = None
 
@@ -41,7 +37,7 @@ class MarineWeatherClient:
 
     @staticmethod
     def fetch_all_data(date_obj: date) -> tuple[Any, Any, Any]:
-        """各データ取得処理を並列実行し、結果をタプルで返す。"""
+        """各API取得処理を並列実行し、結果をまとめて返す。"""
         date_str = date_obj.strftime("%Y-%m-%d")
         
         with ThreadPoolExecutor(max_workers=3) as pool:
@@ -52,7 +48,7 @@ class MarineWeatherClient:
 
     @staticmethod
     def create_robust_session() -> requests.Session:
-        """リトライ機能を備えた高信頼性HTTPセッションを生成する。"""
+        """ネットワーク遅延や一時的な断続に対応するため、リトライ機能を備えたセッションを生成する。"""
         session = requests.Session()
         session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BoatSafetyClient/3.0"})
     
@@ -70,7 +66,7 @@ class MarineWeatherClient:
 
     @staticmethod
     def get_marine_weather(target_date_str: str) -> dict | None:
-        """Open-Meteo APIより大気・海洋データを取得し、構造化されたレポートを返す。"""
+        """Open-Meteo APIから大気および海洋データを取得・統合する。"""
         weather_url = "https://api.open-meteo.com/v1/forecast"
         weather_params = {
             "latitude": SafetyRule.LATITUDE, "longitude": SafetyRule.LONGITUDE,
@@ -102,7 +98,6 @@ class MarineWeatherClient:
 
         try:
             w_data = weather_future.result()
-        
             hourly_data = w_data.get("hourly", {})
             daily_data = w_data.get("daily", {})
         
@@ -118,7 +113,7 @@ class MarineWeatherClient:
             temp_min = daily_data.get("temperature_2m_min", [0.0])[0]
         
         except Exception as e:
-            logger.error(f"Open-Meteo 大気気象データ解析失敗: {e}")
+            logger.error(f"Open-Meteo 大気データ解析失敗: {e}")
             return None
 
         wave_heights = [None] * 24
@@ -130,7 +125,7 @@ class MarineWeatherClient:
             wave_heights = m_hourly.get("wave_height", [None] * 24)
             swell_periods = m_hourly.get("swell_wave_period", [None] * 24)
         except Exception as e:
-            logger.warning(f"Open-Meteo 沿岸海洋データ取得失敗（欠損扱い）: {e}")
+            logger.warning(f"Open-Meteo 沿岸データ取得失敗（欠損扱い）: {e}")
 
         precip_probs = hourly_data.get("precipitation_probability", [0] * 24)
 
@@ -186,12 +181,45 @@ class MarineWeatherClient:
 
                     return tide_list, high_tide_minutes, low_tide_minutes
         except Exception as e:
-            logger.error(f"気象庁天文潮位データパース例外発生: {e}")
+            logger.error(f"気象庁潮位データパース例外: {e}")
 
         return tide_list, [], []
 
     @staticmethod
     def get_umitenki_tide_info(target_date: date) -> UmiInfo:
-        """海天気.jpから情報を取得し、パースして結果を返す。"""
+        """Webソースから潮汐情報をスクレイピングして取得する。"""
         html_text = WeatherAPI.fetch_text(SafetyRule.UMITENKI_BASE_URL)
         return WeatherScraper.parse_umitenki_html(html_text, target_date)
+
+
+class BoatDataService:
+    """航行分析処理を統括するサービスレイヤー。"""
+
+    @staticmethod
+    def get_full_analysis(target_date) -> AnalysisResult:
+        """指定日のデータを取得し、分析結果を生成する。"""
+        date_obj = target_date if not isinstance(target_date, str) else datetime.strptime(target_date, "%Y-%m-%d").date()
+        
+        weather, tide, umi = MarineWeatherClient.fetch_all_data(date_obj)
+        return BoatDataService.build_analysis_data(weather, tide, umi)
+
+    @staticmethod
+    def build_analysis_data(weather_info, tide_data, umi_info) -> AnalysisResult:
+        """取得データを解析し、分析結果オブジェクトを構築する。"""
+        if not weather_info or not tide_data:
+            return None
+
+        tide_result, high_tides, low_tides = tide_data
+        
+        hour_data = NavigationAnalyzer.build_hour_data(
+            weather_info, tide_result, high_tides, low_tides
+        )
+        
+        summary = NavigationAnalyzer.build_navigation_summary(hour_data)
+        
+        return AnalysisResult(
+            hour_data=hour_data,
+            summary=summary,
+            weather_info=weather_info,
+            umi_info=umi_info
+        )
