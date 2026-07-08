@@ -1,20 +1,20 @@
+"""
+formatter.py
+
+各種判定結果および生データを、UI表示に適した形式へ整形する。
+"""
+
 import logging
 from dataclasses import dataclass
 
-# 新しいエンジン層からインポート
 from engine.models import HourForecast
 from engine.rules import SafetyRule
 from engine.engine import BoatSafetyEngine
 
-# 既存のロガー設定など
 logger = logging.getLogger(__name__)
 
-
-# ==============================================================================
-# UI共通スタイル定義 
-# ==============================================================================
 class StatusUIConfig:
-    """判定ステータスごとの表示スタイルを管理する設定クラス"""
+    """判定ステータスに応じた表示スタイルとラベルを管理する。"""
     MAPPING = {
         "safe":     {"color": "#1a7f37", "label": "出港可能"},
         "danger":   {"color": "#c62828", "label": "出港不可"}
@@ -22,17 +22,16 @@ class StatusUIConfig:
 
     @staticmethod
     def get_style(status: str) -> dict:
-        """ステータスに応じたスタイル情報を取得。"""
-        # tide_lowはdangerとして扱う
+        """指定されたステータスに対するスタイル設定を返す。"""
         target = "danger" if status == "tide_low" else status
         return StatusUIConfig.MAPPING.get(target, {"color": "#000000", "label": "不明"})
 
 class TideFormatter:
-    """潮汐情報の表示用テキスト整形"""
+    """潮汐情報の表示用テキスト整形を行う。"""
 
     @staticmethod
     def get_ui_tide_text(umi_info) -> str:
-        """潮汐情報をUI表示用にフォーマットする"""
+        """潮汐情報をUI表示用の文字列にフォーマットする。"""
         if not umi_info or umi_info.tide_name == "不明":
             return "潮汐情報: 取得失敗"
         return (f"🌀 {umi_info.tide_name} "
@@ -40,42 +39,30 @@ class TideFormatter:
                 f"🌗 月齢: {umi_info.moon_age}   "
                 f"🌅 日出: {umi_info.sun_rise} ／ 日入: {umi_info.sun_set}")
 
-
-
 class StatusFormatter:
-    """判定結果をUI表示用に変換する（エンジンから移管）"""
+    """判定結果をUI表示用スタイル（背景色）へ変換する。"""
     
     @staticmethod
     def get_status_color(status_text: str) -> str:
-        """判定文字列から対応する背景色を返す共通ロジック"""
+        """判定文字列から対応する背景色を返す。"""
         if any(kw in status_text for kw in ["危険", "不可"]):
-            return "#f8d7da"  # 赤系
+            return "#f8d7da"
         if any(kw in status_text for kw in ["注意", "潮位", "夜明", "日没"]):
-            return "#fff3cd"  # 黄系
+            return "#fff3cd"
         if "安全" in status_text:
-            return "#d4edda"  # 緑系
-        return "#ffffff"      # デフォルト白
+            return "#d4edda"
+        return "#ffffff"
 
-
-
-
-# ==============================================================================
-# UI表示用の整形を担当するクラス
-# ==============================================================================
 class SafetyReportFormatter:
+    """分析サマリーおよび時系列データの整形を担当する。"""
 
     @staticmethod
     def get_ui_summary_data(summary: "AnalysisSummary") -> dict:
-        """
-        判定結果から、UI表示に必要なラベルとスタイル情報を一括生成する。
-        これにより、UI側の条件分岐（if/else）を排除する。
-        """
-        # クラスの属性に直接アクセス（.get は不要）
+        """判定サマリーからUI用のラベルとスタイル情報を生成する。"""
         is_available = summary.is_available
         status = "safe" if is_available else "danger"
         style = StatusUIConfig.get_style(status)
         
-        # 既存のテキスト生成ロジックを流用（引数はクラスのまま渡す）
         text = SafetyReportFormatter.build_summary_text(summary)
         
         return {
@@ -91,24 +78,17 @@ class SafetyReportFormatter:
         sunrise_hour: int,
         sunset_hour: int
     ) -> list:
-        
-        # 1. 潮位低下などの特殊ルールを適用して、HourForecast のフラグを更新
-        # ※Engine側で hour_data を直接操作（is_safe = False などに書き換え）する形にします
+        """気象データに基づき、テーブル表示用の行データを生成する。"""
         BoatSafetyEngine.apply_sequence_rules(hour_data, sunrise_hour, sunset_hour)
 
-        # 2. 表示行生成（判定済みデータを使うだけ！）
         rows = []
-        # 時間順にソートして処理
         for hour in sorted(hour_data.keys()):
-            # 【修正点】ここで sunrise_hour と sunset_hour を渡す
             rows.append(cls._format_row(hour, hour_data[hour], sunrise_hour, sunset_hour))
         return rows
 
     @staticmethod
     def _format_row(hour: int, data: object, sunrise_hour: int, sunset_hour: int) -> dict:
-        """行ごとのデータ整形ヘルパー"""
-        
-        # ロジックを BoatSafetyEngine に委譲して一元化
+        """単一時間帯のデータをUI表示用辞書に整形する。"""
         status, tag = BoatSafetyEngine.get_display_status(hour, data, sunrise_hour, sunset_hour)
         
         return {
@@ -127,9 +107,7 @@ class SafetyReportFormatter:
 
     @staticmethod
     def build_summary_text(summary: dict) -> str:
-        """
-        総合判定結果から要約テキストを生成する
-        """
+        """総合判定結果から要約テキストを生成する。"""
         if not summary.is_available:
             return (
                 f"連続して安全な時間帯が "
@@ -147,10 +125,9 @@ class SafetyReportFormatter:
             f"後半: {summary.after_str}]"
         )
 
-
 @dataclass
 class UIRow:
-    """テーブル表示用の行データを定義"""
+    """テーブル表示用の行データモデル。"""
     time_range: str
     status: str
     direction: str
@@ -160,11 +137,11 @@ class UIRow:
     tag: str
 
 class ReportFormatter:
-    """UI表示整形専門のクラス"""
+    """UI表示用整形クラス。"""
 
     @staticmethod
     def build_display_rows(table_rows: list) -> list[UIRow]:
-        """dictリストをUIRowオブジェクトのリストに変換する。"""
+        """辞書リストをUIRowオブジェクトのリストへ変換する。"""
         return [
             UIRow(
                 time_range=f"{r['hour']:02d}-{r['hour'] + 1:02d}",

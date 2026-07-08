@@ -1,3 +1,9 @@
+"""
+navigation.py
+
+気象・海象データから航行分析に必要なデータ構造を組み立てる。
+"""
+
 from .models import HourForecast, AnalysisSummary
 from .rules import SafetyRule
 from .tide import TideJudge
@@ -5,7 +11,7 @@ from .wind import WindJudge
 from .engine import BoatSafetyEngine
 
 class NavigationAnalyzer:
-    """気象・海象データおよび判定結果を組み立てるファクトリークラス"""
+    """気象・海象データおよび判定結果を統合し、分析用データ構造を生成する。"""
 
     @classmethod
     def build_hour_data(
@@ -15,6 +21,7 @@ class NavigationAnalyzer:
         high_tides: list[int],
         low_tides: list[int]
     ) -> dict:
+        """気象・潮汐情報から1時間ごとの航行可否データを生成する。"""
 
         max_len = min(
             len(weather_info.wind_speed),
@@ -26,7 +33,6 @@ class NavigationAnalyzer:
         hour_data = {}
 
         for hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
-            # データの範囲外の場合はスキップ
             if hour >= max_len or hour >= len(tide_data):
                 continue
 
@@ -59,7 +65,6 @@ class NavigationAnalyzer:
                 )
             )
 
-
             hour_data[hour] = HourForecast(
                 wind_speed=wind_speed,
                 wind_dir=wind_dir,
@@ -74,9 +79,9 @@ class NavigationAnalyzer:
 
         return hour_data
 
-
     @classmethod
     def build_navigation_summary(cls, hour_data) -> AnalysisSummary:
+        """航行可能な時間帯を抽出し、総合的な分析サマリーを作成する。"""
 
         valid_windows, before_c, after_c = (
             BoatSafetyEngine.calculate_valid_windows(hour_data)

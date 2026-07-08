@@ -1,9 +1,16 @@
+"""
+models.py
+
+ボートの安全判定システムで使用するデータ構造の定義。
+"""
+
 from dataclasses import dataclass
 from typing import List, Optional
 from engine.rules import SafetyRule
 
 @dataclass
 class UmiInfo:
+    """潮汐・月齢・日出入情報。"""
     tide_name: str = "不明"
     high_tide: str = "--"
     low_tide: str = "--"
@@ -13,7 +20,7 @@ class UmiInfo:
 
 @dataclass
 class WeatherReport:
-    """気象・海象データの型付きコンテナ"""
+    """気象・海象データのコンテナ。"""
     times: list[str]
     wind_speed: list[float | None]
     wind_direction: list[float | None]
@@ -25,10 +32,9 @@ class WeatherReport:
     temp_max: float
     temp_min: float
 
-
 @dataclass
 class HourForecast:
-    """1時間ごとの気象・海象・判定結果を保持するクラス"""
+    """1時間ごとの気象・海象および安全性判定結果を保持する。"""
     wind_speed: float | None
     wind_dir: float | None
     wave_height: float | None
@@ -38,9 +44,10 @@ class HourForecast:
     is_safe: bool = False
     is_navigable: bool = False
     dir_kanji: str = "不明"
+    is_tide_warning: bool = False
 
     def get_status_tag(self) -> str:
-        """この時間帯のステータスを判定してタグを返す"""
+        """ステータスに応じたUIタグを返す。"""
         if self.is_safe:
             return "safe"
         if self.is_tide_low():
@@ -48,12 +55,12 @@ class HourForecast:
         return "danger"
 
     def is_tide_low(self) -> bool:
-        """潮位が基準値未満か判定する。"""
+        """現在の潮位が航行基準値未満か判定する。"""
         return (self.tide or 0) < SafetyRule.MIN_TIDE_CM
 
 @dataclass(frozen=True)
 class AnalysisSummary:
-    """総合判定結果を保持するデータクラス。"""
+    """1日分の航行可能時間帯に関する総合判定サマリー。"""
     is_available: bool
     best_window: tuple[int, int, int]
     before_str: str
@@ -61,12 +68,8 @@ class AnalysisSummary:
 
 @dataclass(frozen=True)
 class AnalysisResult:
-    """1日分の解析結果一式を保持するデータクラス"""
-    hour_data: dict  # または List[HourForecast] に近い将来変更可能
+    """解析プロセス全体の結果一式。"""
+    hour_data: dict
     summary: AnalysisSummary
     weather_info: WeatherReport
     umi_info: UmiInfo
-
-
-
-

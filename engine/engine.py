@@ -1,3 +1,10 @@
+"""
+engine.py
+
+ボートの安全運航を判定するメインエンジン。
+物理的限界値および運用ルールに基づき、海況ステータスを算出する。
+"""
+
 from .models import UmiInfo, HourForecast, AnalysisResult, AnalysisSummary
 from .rules import SafetyRule
 from .tide import TideJudge
@@ -19,13 +26,11 @@ class BoatSafetyEngine:
         if any(v is None for v in [wind_speed, wind_dir, wave_height, swell_period]):
             return False
 
-        # 物理判定
         if not WaveJudge.is_physically_safe(wave_height, swell_period):
             return False
         if not WaveJudge.is_complex_safe(wave_height, swell_period):
             return False
 
-        # 運用判定
         is_south = WindJudge.is_south_wind(wind_dir)
         is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
         
@@ -36,21 +41,20 @@ class BoatSafetyEngine:
 
     @classmethod
     def judge_safety(cls, hour, wind_speed, wind_dir, wave_height, swell_period, tide_val, high_tides, low_tides) -> bool:
-        # 1. 司令塔として計算
+        """指定された気象・海象条件における航行の安全性を判定する。"""
         is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
         
-        # 2. 結果を計算機に渡す
         wind_wave_ok = WindWaveEvaluator.judge(
             hour, wind_speed, wind_dir, wave_height, swell_period, is_ebb
         )
         
-        # 3. 統合判定（TideJudgeもここで利用）
         tide_safe = TideJudge.is_tide_safe(tide_val)
         
         return wind_wave_ok and tide_safe
 
     @classmethod
     def calculate_valid_windows(cls, hour_data: dict) -> tuple[list, list, list]:
+        """航行可能な時間帯の候補を算出し、潮位による制約でフィルタリングする。"""
         valid_windows = []
         
         for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
@@ -67,9 +71,6 @@ class BoatSafetyEngine:
                     duration = end_hour - start_hour + 1
                     valid_windows.append((start_hour, end_hour + 1, duration))
         
-        # ... (残りの処理)
-        # 前半/後半の候補抽出 (潮位低下区間との位置関係)
-        # 潮位が MIN_TIDE_CM 未満になる時間を特定し、その前後でフィルタリングする
         low_hours = [h for h, data in hour_data.items() if data.is_tide_low()]
     
         if low_hours:
@@ -83,10 +84,9 @@ class BoatSafetyEngine:
 
         return valid_windows, before_candidates, after_candidates
 
-
     @classmethod
     def get_display_status(cls, hour: int, data: object, sunrise_hour: int, sunset_hour: int) -> tuple[str, str]:
-        """時間外・安全性・潮位判定を一元管理する。"""
+        """UI表示用の海況ステータスとカラーカテゴリを返す。"""
         if not (sunrise_hour <= hour < sunset_hour):
             return ("日没" if hour >= sunset_hour else "夜明"), "danger"
 
@@ -98,14 +98,13 @@ class BoatSafetyEngine:
             
         return "危険", "danger"
 
-
     @classmethod
     def build_before_after_summary(
         cls,
         before_candidates: list,
         after_candidates: list
     ) -> tuple[str, str]:
-
+        """潮位低下前後の最適航行時間を要約する。"""
         before_str = "該当なし"
 
         if before_candidates:
@@ -125,28 +124,25 @@ class BoatSafetyEngine:
         cls,
         valid_windows: list
     ) -> tuple:
-
+        """航行可能な時間帯のうち、最も長い期間を返す。"""
         if not valid_windows:
             return (0, 0, 0)
 
         return max(valid_windows, key=lambda x: x[2])
 
-
     @staticmethod
     def get_ui_tide_text(umi: UmiInfo) -> str:
+        """UI表示用の潮汐・月齢・日出入情報文字列を生成する。"""
         return (f"🌀 {umi.tide_name} "
                 f"(満潮 {umi.high_tide} ／ 干潮 {umi.low_tide})   "
                 f"🌗 月齢: {umi.moon_age}   "
                 f"🌅 日出: {umi.sun_rise} ／ 日入: {umi.sun_set}")
 
-
-
     @classmethod
     def judge_sea_condition_pure(
         cls, wind_speed: float, wave_height: float, swell_period: float
     ) -> bool:
-        """潮位や風向などの運用条件を排除した、純粋な物理的限界のみによる海況判定"""
-        # 通常の安全基準のみを使用
+        """潮位や風向などの運用条件を排除し、純粋な物理的限界のみで海況を判定する。"""
         if wave_height > SafetyRule.MAX_WAVE_HEIGHT_NORMAL:
             return False
         if swell_period >= SafetyRule.MAX_SWELL_PERIOD:
@@ -155,60 +151,47 @@ class BoatSafetyEngine:
             return False
         return True
 
-
     @classmethod
     def apply_sequence_rules(cls, hour_data: dict, sunrise_hour: int, sunset_hour: int):
+        """時間帯ごとの物理的安全性と潮位低下によるリスクをシーケンスで判定する。"""
         hours = sorted(hour_data.keys())
         
-        # 1. 物理的な「絶対安全/危険」をまず確定させる
-        # (潮位はここでは考慮せず、風・波・時間外のみで判定)
         for hour in hours:
             data = hour_data[hour]
             is_time_ok = (sunrise_hour <= hour < sunset_hour)
-            # 物理的に安全な時間帯のみTrue
             data.is_safe = is_time_ok and data.wind_wave_safe
             data.is_tide_warning = False
 
-        # 2. 潮位低下の連続期間（ブロック）を特定して判定する
-        # 潮位低下が続く期間を抽出し、その前後が安全かを確認する
         i = 0
         while i < len(hours):
             if hour_data[hours[i]].is_tide_low():
-                # 潮位低下期間の開始と終了を探す
                 start = i
                 while i < len(hours) and hour_data[hours[i]].is_tide_low():
                     i += 1
                 end = i - 1
                 
-                # ブロックの前後が安全かチェック
+                # 潮位低下期間の前後が安全な場合のみ、黄色（注意）として扱う
                 prev_h = hours[start - 1] if start > 0 else None
                 next_h = hours[end + 1] if end < len(hours) - 1 else None
                 
                 prev_safe = (prev_h is not None and hour_data[prev_h].is_safe)
                 next_safe = (next_h is not None and hour_data[next_h].is_safe)
                 
-                # ブロック全体を潮位注意にするか、それとも危険にするか
                 if prev_safe and next_safe:
                     for idx in range(start, end + 1):
                         hour_data[hours[idx]].is_tide_warning = True
-                        hour_data[hours[idx]].is_safe = False # 黄色にするため
+                        hour_data[hours[idx]].is_safe = False
                 else:
-                    # 前後が安全でない場合、この期間は座礁リスクのため「危険」のまま
                     for idx in range(start, end + 1):
                         hour_data[hours[idx]].is_safe = False
             else:
                 i += 1
 
-
     @classmethod
     def get_status_strict(cls, hour_data: HourForecast, tide_cm: float | None) -> str:
-        """
-        [STEP 1 追加] 判定専用メソッド
-        物理条件・潮位のみでステータスを判定します（ラベルや前後チェックは行わない）
-        """
+        """物理条件と潮位のみに基づき、現在のステータスを判定する。"""
         if not hour_data.wind_wave_safe:
             return "danger"
         if tide_cm is not None and tide_cm < SafetyRule.MIN_TIDE_CM:
             return "tide_low"
         return "safe"
-
