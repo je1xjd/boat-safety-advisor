@@ -59,6 +59,10 @@ class BoatSafetyEngine:
         
         for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
             for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS - 1, SafetyRule.ACTIVITY_END_HOUR):
+
+                if not (hour_data[start_hour].is_safe and hour_data[end_hour].is_safe):
+                            continue
+
                 all_navigable = True
                 
                 for h in range(start_hour, end_hour + 1):
