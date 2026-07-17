@@ -143,6 +143,19 @@ class BoatSafetyEngine:
                 f"🌅 日出: {umi.sun_rise} ／ 日入: {umi.sun_set}")
 
     @classmethod
+    def judge_sea_condition_pure(
+        cls, wind_speed: float, wave_height: float, swell_period: float
+    ) -> bool:
+        """潮位や風向などの運用条件を排除し、純粋な物理的限界のみで海況を判定する。"""
+        if wave_height > SafetyRule.MAX_WAVE_HEIGHT_NORMAL:
+            return False
+        if swell_period >= SafetyRule.MAX_SWELL_PERIOD:
+            return False
+        if wind_speed > SafetyRule.WIND_LIMIT_NORMAL:
+            return False
+        return True
+
+    @classmethod
     def apply_sequence_rules(cls, hour_data: dict, sunrise_hour: int, sunset_hour: int):
         """時間帯ごとの物理的安全性と潮位低下によるリスクをシーケンスで判定する。"""
         hours = sorted(hour_data.keys())
@@ -178,3 +191,11 @@ class BoatSafetyEngine:
             else:
                 i += 1
 
+    @classmethod
+    def get_status_strict(cls, hour_data: HourForecast, tide_cm: float | None) -> str:
+        """物理条件と潮位のみに基づき、現在のステータスを判定する。"""
+        if not hour_data.wind_wave_safe:
+            return "danger"
+        if tide_cm is not None and tide_cm < SafetyRule.MIN_TIDE_CM:
+            return "tide_low"
+        return "safe"

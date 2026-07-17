@@ -46,6 +46,13 @@ class HourForecast:
     dir_kanji: str = "不明"
     is_tide_warning: bool = False
 
+    def get_status_tag(self) -> str:
+        """ステータスに応じたUIタグを返す。"""
+        if self.is_safe:
+            return "safe"
+        if self.is_tide_low():
+            return "tide_low"
+        return "danger"
 
     def is_tide_low(self) -> bool:
         """現在の潮位が航行基準値未満か判定する。"""
