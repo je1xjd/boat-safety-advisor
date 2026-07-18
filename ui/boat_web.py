@@ -4,6 +4,12 @@ boat_web.py
 Streamlitを用いたWeb版の出港判定アプリケーション。
 海況タイムラインを削除し、元の構成に戻しました。
 """
+# 現在のファイル(boat_web.py)の親ディレクトリを最優先パスに追加
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# この後に import を記述
+from engine.loader import get_rule_content
+from services.analysis import BoatDataService
+
 import sys
 import os
 import datetime
@@ -15,7 +21,10 @@ from dataclasses import asdict
 from engine.loader import get_rule_content
 
 # 現在のディレクトリ(ui)の親ディレクトリを確実にパスに追加する
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import sys
+import os
+
+
 
 from engine.loader import get_rule_content
 
