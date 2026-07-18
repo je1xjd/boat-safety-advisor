@@ -14,7 +14,11 @@ import altair as alt
 from dataclasses import asdict
 from engine.loader import get_rule_content
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# 現在のディレクトリ(ui)の親ディレクトリを確実にパスに追加する
+base_path = os.path.dirname(os.path.abspath(__file__))
+parent_path = os.path.dirname(base_path)
+if parent_path not in sys.path:
+    sys.path.append(parent_path)
 
 from services.analysis import BoatDataService
 from engine import AnalysisResult, AnalysisSummary, SafetyRule, BoatSafetyEngine, NavigationAnalyzer, StatusFormatter
