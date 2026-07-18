@@ -17,6 +17,7 @@ class WindWaveEvaluator:
               is_ebb: bool) -> bool:
         """風速、風向、波高、うねり、および潮汐条件に基づき安全性を判定する。"""
 
+
         if any(v is None for v in [wind_speed, wind_dir, wave_height, swell_period]):
             return False
 

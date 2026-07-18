@@ -154,3 +154,15 @@ class ReportFormatter:
             )
             for r in table_rows
         ]
+
+    @staticmethod
+    def filter_display_rows(rows: list[UIRow]) -> list[UIRow]:
+        """
+        18時（17-18時）までのデータのみに絞り込む。
+        要件: 7-8時から17-18時までの11行のみを返す。
+        """
+        return [
+            row for row in rows 
+            if int(row.time_range.split('-')[0]) < SafetyRule.ACTIVITY_END_HOUR
+        ]
+

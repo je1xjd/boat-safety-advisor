@@ -32,7 +32,7 @@ class NavigationAnalyzer:
 
         hour_data = {}
 
-        for hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
+        for hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.FETCH_END_HOUR):
             if hour >= max_len or hour >= len(tide_data):
                 continue
 

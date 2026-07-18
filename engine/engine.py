@@ -43,6 +43,7 @@ class BoatSafetyEngine:
     def judge_safety(cls, hour, wind_speed, wind_dir, wave_height, swell_period, tide_val, high_tides, low_tides) -> bool:
         """指定された気象・海象条件における航行の安全性を判定する。"""
         is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
+
         
         wind_wave_ok = WindWaveEvaluator.judge(
             hour, wind_speed, wind_dir, wave_height, swell_period, is_ebb
@@ -57,8 +58,8 @@ class BoatSafetyEngine:
         """航行可能な時間帯の候補を算出し、潮位による制約でフィルタリングする。"""
         valid_windows = []
         
-        for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
-            for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS - 1, SafetyRule.ACTIVITY_END_HOUR):
+        for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.FETCH_END_HOUR):
+            for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS - 1, SafetyRule.FETCH_END_HOUR):
 
                 if not (hour_data[start_hour].is_safe and hour_data[end_hour].is_safe):
                             continue

@@ -4,6 +4,7 @@ utils.py
 UI表示用の気象要約および時間計算ユーティリティ。
 """
 
+
 WEATHER_MAPPING = {
     0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️",
     48: "🌫️", 51: "🌦️", 53: "🌧️", 55: "🌧️", 61: "🌧️",
@@ -47,3 +48,5 @@ class SunCalculator:
                 pass
 
         return sunrise_hour, sunset_hour
+
+
