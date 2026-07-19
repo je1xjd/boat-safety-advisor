@@ -123,7 +123,10 @@ if st.session_state.current_page in CHECKLIST_CONFIG:
     # チェックリストページならチェックボックスを表示
     elif items and "エラー" not in items[0]:
         for item in items:
-            st.checkbox(item)
+            # チェックボックスを押し、Trueになった瞬間にホームへ遷移
+            if st.checkbox(item, key=f"check_{item}"):
+                st.session_state.current_page = "home"
+                st.rerun()
     else:
         st.error(items[0] if items else "データが空です。")
         
