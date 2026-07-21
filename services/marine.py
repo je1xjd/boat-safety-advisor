@@ -74,8 +74,8 @@ class MarineWeatherClient:
         weather_url = "https://api.open-meteo.com/v1/forecast"
         weather_params = {
             "latitude": SafetyRule.LATITUDE, "longitude": SafetyRule.LONGITUDE,
-            "hourly": "wind_speed_10m,wind_direction_10m,weather_code,precipitation_probability",
-            "daily": "weather_code,temperature_2m_max,temperature_2m_min",
+            "hourly": "wind_speed_10m,wind_direction_10m,weather_code,precipitation_probability,temperature_2m",
+            "daily": "weather_code",
             "timezone": "Asia/Tokyo", "start_date": target_date_str, "end_date": target_date_str
         }
     
@@ -127,8 +127,16 @@ class MarineWeatherClient:
         precip_probs = hourly_data.get("precipitation_probability", [0] * 24)
     
         daily_weather = daily_data.get("weather_code", [None])[0]
-        temp_max = daily_data.get("temperature_2m_max", [0.0])[0]
-        temp_min = daily_data.get("temperature_2m_min", [0.0])[0]
+
+        # 7時から18時までの時間別気温を取得してフィルタリング・算出する
+        hourly_temps = hourly_data.get("temperature_2m", [None] * 24)
+        target_temps = [
+            hourly_temps[h] for h in range(len(hourly_temps))
+            if SafetyRule.ACTIVITY_START_HOUR <= h <= SafetyRule.ACTIVITY_END_HOUR and h < len(hourly_temps) and hourly_temps[h] is not None
+        ]
+
+        temp_max = max(target_temps) if target_temps else 0.0
+        temp_min = min(target_temps) if target_temps else 0.0
 
         m_hourly = m_data.get("hourly", {})
         wave_heights = m_hourly.get("wave_height", [None] * 24)
@@ -143,8 +151,8 @@ class MarineWeatherClient:
             precipitation_probability=precip_probs,
             weather_code=weather_codes,
             daily_weather_code=daily_weather,
-            temp_max=temp_max if temp_max is not None else 0.0,
-            temp_min=temp_min if temp_min is not None else 0.0,
+            temp_max=temp_max,
+            temp_min=temp_min,
         )
 
     @staticmethod
