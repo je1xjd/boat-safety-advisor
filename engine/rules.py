@@ -40,7 +40,12 @@ class SafetyRule:
 
     WIND_Y_LIMIT = 15
     WAVE_Y_LIMIT = 3
-    TIDE_Y_LIMIT = 300
+    TIDE_Y_LIMIT = 200
+
+    WIND_COLOR: str = "#1f77b4"
+    WAVE_COLOR: str = "#3b5998"
+    TIDE_COLOR: str = "#2ca02c"
+
 
     TIDE_STATION_CODE: str = "D8"
     JMA_TIDE_BASE_URL: str = "https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt"
