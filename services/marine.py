@@ -69,8 +69,8 @@ class MarineWeatherClient:
         return session
 
     @staticmethod
-    def get_marine_weather(target_date_str: str) -> dict | None:
-        """Open-Meteo APIより大気・海洋データを取得し、構造化されたレポートを返す。"""
+    def _fetch_weather_raw(target_date_str: str) -> tuple[dict, dict]:
+        """Open-Meteoの天気・海洋APIから生データを並列取得する。"""
         weather_url = "https://api.open-meteo.com/v1/forecast"
         weather_params = {
             "latitude": SafetyRule.LATITUDE, "longitude": SafetyRule.LONGITUDE,
@@ -100,39 +100,39 @@ class MarineWeatherClient:
             weather_future = executor.submit(fetch_weather)
             marine_future = executor.submit(fetch_marine)
 
-        try:
-            w_data = weather_future.result()
+        # 天気データは必須（例外は呼び出し元でキャッチ）
+        w_data = weather_future.result()
         
-            hourly_data = w_data.get("hourly", {})
-            daily_data = w_data.get("daily", {})
-        
-            raw_winds = hourly_data.get("wind_speed_10m", [None] * 24)
-            wind_speed_ms = [(v / 3.6 if v is not None else None) for v in raw_winds]
-        
-            wind_dirs = hourly_data.get("wind_direction_10m", [None] * 24)
-            weather_codes = hourly_data.get("weather_code", [None] * 24)
-            times = hourly_data.get("time", [""] * 24)
-        
-            daily_weather = daily_data.get("weather_code", [None])[0]
-            temp_max = daily_data.get("temperature_2m_max", [0.0])[0]
-            temp_min = daily_data.get("temperature_2m_min", [0.0])[0]
-        
-        except Exception as e:
-            logger.error(f"Open-Meteo 大気気象データ解析失敗: {e}")
-            return None
-
-        wave_heights = [None] * 24
-        swell_periods = [None] * 24
-
+        # 海洋データは失敗しても警告のみで補完する
+        m_data = {}
         try:
             m_data = marine_future.result()
-            m_hourly = m_data.get("hourly", {})
-            wave_heights = m_hourly.get("wave_height", [None] * 24)
-            swell_periods = m_hourly.get("swell_wave_period", [None] * 24)
         except Exception as e:
             logger.warning(f"Open-Meteo 沿岸海洋データ取得失敗（欠損扱い）: {e}")
 
+        return w_data, m_data
+
+    @staticmethod
+    def _convert_forecast(w_data: dict, m_data: dict) -> WeatherReport:
+        """取得した生データを解析し、WeatherReportオブジェクトに変換する。"""
+        hourly_data = w_data.get("hourly", {})
+        daily_data = w_data.get("daily", {})
+    
+        raw_winds = hourly_data.get("wind_speed_10m", [None] * 24)
+        wind_speed_ms = [(v / 3.6 if v is not None else None) for v in raw_winds]
+    
+        wind_dirs = hourly_data.get("wind_direction_10m", [None] * 24)
+        weather_codes = hourly_data.get("weather_code", [None] * 24)
+        times = hourly_data.get("time", [""] * 24)
         precip_probs = hourly_data.get("precipitation_probability", [0] * 24)
+    
+        daily_weather = daily_data.get("weather_code", [None])[0]
+        temp_max = daily_data.get("temperature_2m_max", [0.0])[0]
+        temp_min = daily_data.get("temperature_2m_min", [0.0])[0]
+
+        m_hourly = m_data.get("hourly", {})
+        wave_heights = m_hourly.get("wave_height", [None] * 24)
+        swell_periods = m_hourly.get("swell_wave_period", [None] * 24)
 
         return WeatherReport(
             times=times,
@@ -146,6 +146,16 @@ class MarineWeatherClient:
             temp_max=temp_max if temp_max is not None else 0.0,
             temp_min=temp_min if temp_min is not None else 0.0,
         )
+
+    @staticmethod
+    def get_marine_weather(target_date_str: str) -> WeatherReport | None:
+        """Open-Meteo APIより大気・海洋データを取得し、構造化されたレポートを返す。"""
+        try:
+            w_data, m_data = MarineWeatherClient._fetch_weather_raw(target_date_str)
+            return MarineWeatherClient._convert_forecast(w_data, m_data)
+        except Exception as e:
+            logger.error(f"Open-Meteo 大気気象データ解析失敗: {e}")
+            return None
 
     @staticmethod
     def get_tide_data(target_date: date) -> tuple[list, list, list]:
@@ -192,6 +202,6 @@ class MarineWeatherClient:
 
     @staticmethod
     def get_umitenki_tide_info(target_date: date) -> UmiInfo:
-        """海天気.jpから情報を取得し、パースして結果を返す。"""
+        """海天気.jpから情報を取得し、パースして結果を返す。[cite: 3]"""
         html_text = WeatherAPI.fetch_text(SafetyRule.UMITENKI_BASE_URL)
         return WeatherScraper.parse_umitenki_html(html_text, target_date)
