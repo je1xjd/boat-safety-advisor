@@ -46,12 +46,12 @@ with st.sidebar:
         st.rerun()
 
     # 判定基準確認ボタン（ページ遷移として定義）
-    if st.button("⚖ 判定基準を確認", width='stretch'):
+    if st.button("⚖ 判定基準", width='stretch'):
         st.session_state.current_page = "criteria"
         st.rerun()
 
     st.divider()
-    st.subheader("🚀 出港準備")
+    st.subheader("🚀 出港前")
     if st.button("下架前チェック", width='stretch'):
         st.session_state.current_page = "pre_lower"
         st.rerun()
@@ -60,7 +60,7 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-    st.subheader("⚓ 帰港処理")
+    st.subheader("⚓ 帰港後")
     if st.button("上架前チェック", width='stretch'):
         st.session_state.current_page = "pre_lift"
         st.rerun()
@@ -123,10 +123,7 @@ if st.session_state.current_page in CHECKLIST_CONFIG:
     # チェックリストページならチェックボックスを表示
     elif items and "エラー" not in items[0]:
         for item in items:
-            # チェックボックスを押し、Trueになった瞬間にホームへ遷移
-            if st.checkbox(item, key=f"check_{item}"):
-                st.session_state.current_page = "home"
-                st.rerun()
+            st.checkbox(item)
     else:
         st.error(items[0] if items else "データが空です。")
         
@@ -187,7 +184,8 @@ elif st.session_state.current_page == "home":
 
             # 3. グラフ用: 全データ(all_rows)から直接作成
             df_graph = pd.DataFrame([asdict(row) for row in all_rows])
-            df_graph = df_graph.rename(columns={"time_range": "時間", "wind": "風速", "wave": "波浪", "tide": "潮位"})
+            # ※ ここで "wave" のリネーム先を "波浪" から "波高" に変更
+            df_graph = df_graph.rename(columns={"time_range": "時間", "wind": "風速", "wave": "波高", "tide": "潮位"})
         
         # 数値抽出関数（日本語名のエラーを防ぐため、単純な抽出を行う）
         def extract_number(val):
@@ -197,7 +195,7 @@ elif st.session_state.current_page == "home":
 
         df_graph["時間"] = df_graph["時間"].apply(extract_number).astype(int)
         df_graph["風速"] = df_graph["風速"].apply(extract_number)
-        df_graph["波浪"] = df_graph["波浪"].apply(extract_number)
+        df_graph["波高"] = df_graph["波高"].apply(extract_number) # カラム名変更に合わせる
         df_graph["潮位"] = df_graph["潮位"].apply(extract_number)
         
         # CSSでグラフへのマウス入力を完全に無効化
@@ -209,22 +207,15 @@ elif st.session_state.current_page == "home":
         </style>
         """, unsafe_allow_html=True)
 
-        # 4. 各指標ごとのタブ表示
-        # 【重要】CSSでグラフ領域へのホイール・マウス操作を物理的に遮断する
-        st.markdown("""
-        <style>
-        [data-testid="stVegaLiteChart"] {
-            pointer-events: none;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+        def draw_fixed_chart(df, y_col, color, limit_val=None, limit_label=None, y_max=None):
+            # 1. データ折れ線グラフ（domainでY軸の最大値を固定）
+            y_scale_args = {"zero": True}
+            if y_max is not None:
+                y_scale_args["domain"] = [0, y_max]
 
-        def draw_fixed_chart(df, y_col, color):
-            # 18時までのデータのみに絞り込んだdf_graphを使用する前提
-            chart = alt.Chart(df).mark_line(point=True).encode(
+            line = alt.Chart(df).mark_line(point=True, color=color).encode(
                 x=alt.X("時間:Q", 
                         title="時刻", 
-                        # 定数を利用して表示範囲を制御
                         scale=alt.Scale(domain=[SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR]),
                         axis=alt.Axis(
                             format="d", 
@@ -232,10 +223,38 @@ elif st.session_state.current_page == "home":
                             values=list(range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR + 1))
                         )
                 ), 
-                y=alt.Y(f"{y_col}:Q", scale=alt.Scale(zero=True))
-            ).properties(height=300).configure_line(color=color)
-            
-            # 補助線とスタイルを一括適用
+                y=alt.Y(f"{y_col}:Q", title=y_col, scale=alt.Scale(**y_scale_args))
+            )
+
+            # 2. ボーダー線（赤の破線、破線マーク付き凡例）を追加
+            if limit_val is not None:
+                label_text = limit_label or "制限値"
+                rule_df = pd.DataFrame([{
+                    "y_val": limit_val,
+                    "legend_label": label_text
+                }])
+                rule = alt.Chart(rule_df).mark_rule(
+                    color="red",
+                    strokeDash=[4, 4],
+                    size=2
+                ).encode(
+                    y="y_val:Q",
+                    strokeDash=alt.value([4, 4]),
+                    color=alt.Color(
+                        "legend_label:N", 
+                        scale=alt.Scale(domain=[label_text], range=["red"]), 
+                        legend=alt.Legend(
+                            title=None, 
+                            orient="top-right",
+                            symbolType="stroke"
+                        )
+                    )
+                )
+                chart = alt.layer(line, rule).properties(height=300)
+            else:
+                chart = line.properties(height=300)
+
+            # 3. グリッド等のスタイル設定
             return chart.configure_axis(
                 grid=True,
                 gridColor="#E0E0E0",
@@ -244,13 +263,37 @@ elif st.session_state.current_page == "home":
             )
 
         with tab_wind:
-            st.subheader("時刻別 風速 (m/s)") # サブヘッダーも「時刻」に変更
-            st.altair_chart(draw_fixed_chart(df_graph, "風速", "#3498db"), width='stretch')
+            st.subheader("時刻別 風速 (m/s)")
+            st.altair_chart(
+                draw_fixed_chart(
+                    df_graph, "風速", "#1f77b4", 
+                    limit_val=SafetyRule.WIND_LIMIT_NORMAL,
+                    limit_label="制限風速",
+                    y_max=SafetyRule.WIND_Y_LIMIT
+                ), 
+                width='stretch'
+            )
         
         with tab_wave:
             st.subheader("時刻別 波高 (m)")
-            st.altair_chart(draw_fixed_chart(df_graph, "波浪", "#e74c3c"), width='stretch')
+            st.altair_chart(
+                draw_fixed_chart(
+                    df_graph, "波高", "#3b5998", 
+                    limit_val=SafetyRule.MAX_WAVE_HEIGHT_NORMAL,
+                    limit_label="制限波高",
+                    y_max=SafetyRule.WAVE_Y_LIMIT
+                ), 
+                width='stretch'
+            )
             
         with tab_tide:
             st.subheader("時刻別 潮位 (cm)")
-            st.altair_chart(draw_fixed_chart(df_graph, "潮位", "#2ecc71"), width='stretch')
+            st.altair_chart(
+                draw_fixed_chart(
+                    df_graph, "潮位", "#2ca02c", 
+                    limit_val=SafetyRule.MIN_TIDE_CM,
+                    limit_label="最低潮位",
+                    y_max=SafetyRule.TIDE_Y_LIMIT
+                ), 
+                width='stretch'
+            )

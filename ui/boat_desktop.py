@@ -218,9 +218,21 @@ class BoatSafetyApp:
         tides = [float(v.tide) for v in filtered_items.values()]
 
         # 描画用内部関数
-        def draw(parent, data, ylabel, color, y_lim):
+        def draw(parent, data, ylabel, color, y_lim, threshold=None, threshold_label=None):
             fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
             ax.plot(hours, data, color=color, marker="o")
+            
+            # 安全・危険のボーダー線（赤の破線）を追加
+            if threshold is not None:
+                ax.axhline(
+                    y=threshold, 
+                    color="red", 
+                    linestyle="--", 
+                    linewidth=1.5, 
+                    label=threshold_label
+                )
+                if threshold_label:
+                    ax.legend(loc="upper right", fontsize=9)
             
             ax.set_xlabel("時刻")
             ax.set_ylabel(ylabel)
@@ -240,9 +252,10 @@ class BoatSafetyApp:
             canvas.draw()
             canvas.get_tk_widget().pack(fill="both", expand=True)
 
-        draw(self.wind_tab, winds, "風速(m/s)", "blue", 15)
-        draw(self.wave_tab, waves, "波高(m)", "red", 3)
-        draw(self.tide_tab, tides, "潮位(cm)", "green", 300)
+        # 各グラフに SafetyRule の制限値をボーダーとして渡す
+        draw(self.wind_tab, winds, "風速(m/s)", "#1f77b4", SafetyRule.WIND_Y_LIMIT, threshold=SafetyRule.WIND_LIMIT_NORMAL, threshold_label="制限風速")
+        draw(self.wave_tab, waves, "波高(m)", "#3b5998", SafetyRule.WAVE_Y_LIMIT, threshold=SafetyRule.MAX_WAVE_HEIGHT_NORMAL, threshold_label="制限波高")
+        draw(self.tide_tab, tides, "潮位(cm)", "#2ca02c", SafetyRule.TIDE_Y_LIMIT, threshold=SafetyRule.MIN_TIDE_CM, threshold_label="最低潮位")
 
     def _handle_async_error(self, err_msg: str) -> None:
         self.submit_btn.config(state=tk.NORMAL, text="🔍 海況判定を実行する")
@@ -253,18 +266,19 @@ class BoatSafetyApp:
         menu = tk.Menu(self.root, tearoff=0, font=("Yu Gothic UI", 10))
         
         # 1. 判定基準の確認
-        menu.add_command(label="判定基準を確認", command=self._show_safety_criteria)
+        menu.add_command(label="⚖ 判定基準", command=self._show_safety_criteria)
         menu.add_separator()
         
-        # 2. 4分割したチェックリストメニュー
-        checklist_map = [
-            ("PRE_LOWER", "下架前チェック", "下架前チェックリスト"),
-            ("POST_LOWER", "下架後チェック", "下架後チェックリスト"),
-            ("PRE_LIFT", "上架前チェック", "上架前チェックリスト"),
-            ("POST_LIFT", "上架後チェック", "上架後チェックリスト")
-        ]
-        for key, label, title in checklist_map:
-            menu.add_command(label=label, command=lambda k=key, t=title: self._open_checklist(k, t))
+        # 2. 出港準備グループ
+        menu.add_command(label="🚀 【出港前】", state="disabled")
+        menu.add_command(label=" 下架前チェック", command=lambda: self._open_checklist("PRE_LOWER", "下架前チェックリスト"))
+        menu.add_command(label=" 下架後チェック", command=lambda: self._open_checklist("POST_LOWER", "下架後チェックリスト"))
+        menu.add_separator()
+        
+        # 3. 帰港処理グループ
+        menu.add_command(label="⚓ 【帰港後】", state="disabled")
+        menu.add_command(label=" 上架前チェック", command=lambda: self._open_checklist("PRE_LIFT", "上架前チェックリスト"))
+        menu.add_command(label=" 上架後チェック", command=lambda: self._open_checklist("POST_LIFT", "上架後チェックリスト"))
         
         menu.add_separator()
         menu.add_command(label="⚙ 設定", command=self._on_settings_select)
@@ -313,13 +327,29 @@ class BoatSafetyApp:
         listbox.bind("<<ListboxSelect>>", on_select)
 
     def _show_safety_criteria(self):
-        file_path = os.path.join(os.path.dirname(__file__), "safety_criteria.txt")
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            messagebox.showinfo("判定基準", content)
-        except Exception as e:
-            messagebox.showerror("エラー", f"基準ファイルの読み込みに失敗しました: {e}")
+        """下架前チェックリストと同様の表示形式で安全基準を表示する（音なし）。"""
+        top = tk.Toplevel(self.root)
+        top.title("ボート出港安全基準")
+        top.geometry("450x600")
+
+        # 1. 閉じるボタン（チェックリストと同じ配置）
+        tk.Button(top, text="閉じる", command=top.destroy, bg="#eeeeee", font=("Yu Gothic UI", 10)).pack(fill="x", pady=5)
+
+        # 2. スクロールバーとリストボックスを配置
+        frame = tk.Frame(top)
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        scrollbar = tk.Scrollbar(frame, orient="vertical")
+        listbox = tk.Listbox(frame, yscrollcommand=scrollbar.set, font=("Yu Gothic UI", 11))
+        
+        scrollbar.config(command=listbox.yview)
+        scrollbar.pack(side="right", fill="y")
+        listbox.pack(side="left", fill="both", expand=True)
+
+        # 3. エンジンから基準データを取得してリストボックスに挿入
+        items = get_rule_content("SAFETY_CRITERIA")
+        for item in items:
+            listbox.insert("end", item)
 
     def _on_settings_select(self):
         messagebox.showinfo("設定", "設定画面は現在準備中です。")
