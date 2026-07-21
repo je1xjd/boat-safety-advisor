@@ -58,8 +58,8 @@ class BoatSafetyEngine:
         """航行可能な時間帯の候補を算出し、潮位による制約でフィルタリングする。"""
         valid_windows = []
         
-        for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.FETCH_END_HOUR):
-            for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS - 1, SafetyRule.FETCH_END_HOUR):
+        for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
+            for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS - 1, SafetyRule.ACTIVITY_END_HOUR):
 
                 if not (hour_data[start_hour].is_safe and hour_data[end_hour].is_safe):
                             continue

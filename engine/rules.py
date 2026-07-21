@@ -38,6 +38,10 @@ class SafetyRule:
     WIND_OVERRIDE_MARGIN: float = 1.0
     WIND_OVERRIDE_WAVE_HEIGHT: float = 0.4
 
+    WIND_Y_LIMIT = 15
+    WAVE_Y_LIMIT = 3
+    TIDE_Y_LIMIT = 300
+
     TIDE_STATION_CODE: str = "D8"
     JMA_TIDE_BASE_URL: str = "https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt"
     UMITENKI_BASE_URL: str = "https://www.umitenki.jp/tenki/1545/14days"
