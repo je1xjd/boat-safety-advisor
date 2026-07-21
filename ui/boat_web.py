@@ -25,6 +25,7 @@ from engine.formatter import (
     TideFormatter
 )
 from engine.utils import summarize_daytime_weather, SunCalculator
+from ui.webcharts import extract_number, draw_fixed_chart
 
 # ページ設定
 st.set_page_config(
@@ -187,12 +188,6 @@ elif st.session_state.current_page == "home":
             # ※ ここで "wave" のリネーム先を "波浪" から "波高" に変更
             df_graph = df_graph.rename(columns={"time_range": "時間", "wind": "風速", "wave": "波高", "tide": "潮位"})
         
-        # 数値抽出関数（日本語名のエラーを防ぐため、単純な抽出を行う）
-        def extract_number(val):
-            import re
-            m = re.search(r"(\d+\.?\d*)", str(val))
-            return float(m.group(1)) if m else 0.0
-
         df_graph["時間"] = df_graph["時間"].apply(extract_number).astype(int)
         df_graph["風速"] = df_graph["風速"].apply(extract_number)
         df_graph["波高"] = df_graph["波高"].apply(extract_number) # カラム名変更に合わせる
@@ -207,66 +202,11 @@ elif st.session_state.current_page == "home":
         </style>
         """, unsafe_allow_html=True)
 
-        def draw_fixed_chart(df, y_col, color, limit_val=None, limit_label=None, y_max=None):
-            # 1. データ折れ線グラフ（domainでY軸の最大値を固定）
-            y_scale_args = {"zero": True}
-            if y_max is not None:
-                y_scale_args["domain"] = [0, y_max]
-
-            line = alt.Chart(df).mark_line(point=True, color=color).encode(
-                x=alt.X("時間:Q", 
-                        title="時刻", 
-                        scale=alt.Scale(domain=[SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR]),
-                        axis=alt.Axis(
-                            format="d", 
-                            tickCount=SafetyRule.ACTIVITY_END_HOUR - SafetyRule.ACTIVITY_START_HOUR + 1,
-                            values=list(range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR + 1))
-                        )
-                ), 
-                y=alt.Y(f"{y_col}:Q", title=y_col, scale=alt.Scale(**y_scale_args))
-            )
-
-            # 2. ボーダー線（赤の破線、破線マーク付き凡例）を追加
-            if limit_val is not None:
-                label_text = limit_label or "制限値"
-                rule_df = pd.DataFrame([{
-                    "y_val": limit_val,
-                    "legend_label": label_text
-                }])
-                rule = alt.Chart(rule_df).mark_rule(
-                    color="red",
-                    strokeDash=[4, 4],
-                    size=2
-                ).encode(
-                    y="y_val:Q",
-                    strokeDash=alt.value([4, 4]),
-                    color=alt.Color(
-                        "legend_label:N", 
-                        scale=alt.Scale(domain=[label_text], range=["red"]), 
-                        legend=alt.Legend(
-                            title=None, 
-                            orient="top-right",
-                            symbolType="stroke"
-                        )
-                    )
-                )
-                chart = alt.layer(line, rule).properties(height=300)
-            else:
-                chart = line.properties(height=300)
-
-            # 3. グリッド等のスタイル設定
-            return chart.configure_axis(
-                grid=True,
-                gridColor="#E0E0E0",
-                gridDash=[2, 2],
-                gridWidth=0.5
-            )
-
         with tab_wind:
             st.subheader("時刻別 風速 (m/s)")
             st.altair_chart(
                 draw_fixed_chart(
-                    df_graph, "風速", "#1f77b4", 
+                    df_graph, "風速", SafetyRule.WIND_COLOR, 
                     limit_val=SafetyRule.WIND_LIMIT_NORMAL,
                     limit_label="制限風速",
                     y_max=SafetyRule.WIND_Y_LIMIT
@@ -278,7 +218,7 @@ elif st.session_state.current_page == "home":
             st.subheader("時刻別 波高 (m)")
             st.altair_chart(
                 draw_fixed_chart(
-                    df_graph, "波高", "#3b5998", 
+                    df_graph, "波高", SafetyRule.WAVE_COLOR, 
                     limit_val=SafetyRule.MAX_WAVE_HEIGHT_NORMAL,
                     limit_label="制限波高",
                     y_max=SafetyRule.WAVE_Y_LIMIT
@@ -290,7 +230,7 @@ elif st.session_state.current_page == "home":
             st.subheader("時刻別 潮位 (cm)")
             st.altair_chart(
                 draw_fixed_chart(
-                    df_graph, "潮位", "#2ca02c", 
+                    df_graph, "潮位", SafetyRule.TIDE_COLOR, 
                     limit_val=SafetyRule.MIN_TIDE_CM,
                     limit_label="最低潮位",
                     y_max=SafetyRule.TIDE_Y_LIMIT
