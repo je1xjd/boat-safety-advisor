@@ -61,8 +61,6 @@ def render_all_desktop_graphs(wind_tab, wave_tab, tide_tab, hour_data):
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True)
 
-    # 各グラフに SafetyRule の制限値をボーダーとして渡す
-    draw(wind_tab, winds, "風速(m/s)", SafetyRule.WIND_COLOR, SafetyRule.WIND_Y_LIMIT, threshold=SafetyRule.WIND_LIMIT_NORMAL if hasattr(SafetyRule, "WIND_LIMIT_NORMAL") else SafetyRule.WIND_LIMIT_NORMAL, threshold_label="制限風速")
     # ※ コード内の変数スペルに配慮
     draw(wind_tab, winds, "風速(m/s)", SafetyRule.WIND_COLOR, SafetyRule.WIND_Y_LIMIT, threshold=SafetyRule.WIND_LIMIT_NORMAL, threshold_label="制限風速")
     draw(wave_tab, waves, "波高(m)", SafetyRule.WAVE_COLOR, SafetyRule.WAVE_Y_LIMIT, threshold=SafetyRule.MAX_WAVE_HEIGHT_NORMAL, threshold_label="制限波高")

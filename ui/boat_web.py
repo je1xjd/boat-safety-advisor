@@ -2,7 +2,6 @@
 boat_web.py
 
 Streamlitを用いたWeb版の出港判定アプリケーション。
-海況タイムラインを削除し、元の構成に戻しました。
 """
 import sys
 import os
@@ -99,7 +98,6 @@ def highlight_status(row):
 
 
 # --- ページ定義（データ構造） ---
-# ファイル名からセクションキーへの変更で、ファイルシステムへの依存を排除
 CHECKLIST_CONFIG = {
     "pre_lower": ("PRE_LOWER", "下架前チェックリスト"),
     "post_lower": ("POST_LOWER", "下架後チェックリスト"),
@@ -115,13 +113,11 @@ if st.session_state.current_page in CHECKLIST_CONFIG:
     
     items = get_rule_content(section_key)
     
-    # 判定基準ページならチェックボックスなしでテキスト表示
     if st.session_state.current_page == "criteria":
         if items:
             st.text("\n".join(items))
         else:
             st.error("データが空です。")
-    # チェックリストページならチェックボックスを表示
     elif items and "エラー" not in items[0]:
         for item in items:
             st.checkbox(item)
@@ -133,7 +129,6 @@ if st.session_state.current_page in CHECKLIST_CONFIG:
         st.rerun()
 
 elif st.session_state.current_page == "home":
-    # (以下、既存のホーム画面処理)
     st.title("🚤 ボート出港判定")
     st.caption("相模川河口の潮位・潮汐・風速・風向・波高・うねりを総合評価")
 
@@ -152,47 +147,48 @@ elif st.session_state.current_page == "home":
         with st.spinner("データ取得中..."):
             st.session_state.analysis_result = load_all_data(target_date)
 
-    # 判定結果がある場合のみタブを表示する
+    # 判定結果がある場合の描画順序を変更
     if "analysis_result" in st.session_state and st.session_state.analysis_result:
         result = st.session_state.analysis_result
         
-        # 1. タブを直接指標別に並べる
+        # 1. 上部に総合サマリー（出港判定、天気、連続活動枠、潮位情報バー）を表示
+        ui_data = SafetyReportFormatter.get_ui_summary_data(result.summary)
+        render_summary_card(
+            ui_data["label"], ui_data["color"], 
+            summarize_daytime_weather(result.weather_info.weather_code, result.weather_info.precipitation_probability),
+            result.weather_info.temp_max, result.weather_info.temp_min,
+            result.summary.best_window, result.summary.before_str, result.summary.after_str,
+            TideFormatter.get_ui_tide_text(result.umi_info), result.umi_info
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 2. 共通データの構築（テーブル用・グラフ用）をタブ表示の「前」に行う
+        table_rows = SafetyReportFormatter.build_table_rows(result.hour_data, *SunCalculator.get_sun_times(result.umi_info))
+        all_rows = ReportFormatter.build_display_rows(table_rows)
+        display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)
+        
+        df = pd.DataFrame([asdict(row) for row in display_rows_filtered])
+        df = df.rename(columns={"time_range": "時間", "status": "判定", "direction": "風向", "wind": "風速", "wave": "波浪", "tide": "潮位"})
+        
+        # グラフ用の数値を正しく抽出したデータフレームを作成
+        graph_data_list = []
+        for k, v in result.hour_data.items():
+            if SafetyRule.ACTIVITY_START_HOUR <= int(k) <= SafetyRule.ACTIVITY_END_HOUR:
+                graph_data_list.append({
+                    "時間": int(k),
+                    "風速": v.wind_speed if v.wind_speed is not None else 0.0,
+                    "波高": extract_number(v.wave_height),
+                    "潮位": extract_number(v.tide)
+                })
+        df_graph = pd.DataFrame(graph_data_list)
+
+        # 3. タブを配置
         tab1, tab_wind, tab_wave, tab_tide = st.tabs(["📊 判定結果", "🍃 風速グラフ", "🌊 波高グラフ", "🚢 潮位グラフ"])
         
-        # 2. 判定結果と詳細タブ
         with tab1:
-            ui_data = SafetyReportFormatter.get_ui_summary_data(result.summary)
-            render_summary_card(
-                ui_data["label"], ui_data["color"], 
-                summarize_daytime_weather(result.weather_info.weather_code, result.weather_info.precipitation_probability),
-                result.weather_info.temp_max, result.weather_info.temp_min,
-                result.summary.best_window, result.summary.before_str, result.summary.after_str,
-                TideFormatter.get_ui_tide_text(result.umi_info), result.umi_info
-            )
-
-            # テーブル表示用のデータ構築
-            # --- 修正箇所: テーブル表示用のデータ構築 ---
-            table_rows = SafetyReportFormatter.build_table_rows(result.hour_data, *SunCalculator.get_sun_times(result.umi_info))
-
-            # 1. 全データを生成（グラフ用に使用）
-            all_rows = ReportFormatter.build_display_rows(table_rows)
-
-            # 2. テーブル用: フィルタリングを適用
-            display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)
-            df = pd.DataFrame([asdict(row) for row in display_rows_filtered])
-            df = df.rename(columns={"time_range": "時間", "status": "判定", "direction": "風向", "wind": "風速", "wave": "波浪", "tide": "潮位"})
             st.table(df[["時間", "判定", "風向", "風速", "波浪", "潮位"]].style.apply(highlight_status, axis=1))
 
-            # 3. グラフ用: 全データ(all_rows)から直接作成
-            df_graph = pd.DataFrame([asdict(row) for row in all_rows])
-            # ※ ここで "wave" のリネーム先を "波浪" から "波高" に変更
-            df_graph = df_graph.rename(columns={"time_range": "時間", "wind": "風速", "wave": "波高", "tide": "潮位"})
-        
-        df_graph["時間"] = df_graph["時間"].apply(extract_number).astype(int)
-        df_graph["風速"] = df_graph["風速"].apply(extract_number)
-        df_graph["波高"] = df_graph["波高"].apply(extract_number) # カラム名変更に合わせる
-        df_graph["潮位"] = df_graph["潮位"].apply(extract_number)
-        
         # CSSでグラフへのマウス入力を完全に無効化
         st.markdown("""
         <style>
@@ -203,7 +199,7 @@ elif st.session_state.current_page == "home":
         """, unsafe_allow_html=True)
 
         with tab_wind:
-            st.subheader("時刻別 風速 (m/s)")
+            st.subheader("風速 (m/s)")
             st.altair_chart(
                 draw_fixed_chart(
                     df_graph, "風速", SafetyRule.WIND_COLOR, 
@@ -215,7 +211,7 @@ elif st.session_state.current_page == "home":
             )
         
         with tab_wave:
-            st.subheader("時刻別 波高 (m)")
+            st.subheader("波高 (m)")
             st.altair_chart(
                 draw_fixed_chart(
                     df_graph, "波高", SafetyRule.WAVE_COLOR, 
@@ -227,7 +223,7 @@ elif st.session_state.current_page == "home":
             )
             
         with tab_tide:
-            st.subheader("時刻別 潮位 (cm)")
+            st.subheader("潮位 (cm)")
             st.altair_chart(
                 draw_fixed_chart(
                     df_graph, "潮位", SafetyRule.TIDE_COLOR, 
