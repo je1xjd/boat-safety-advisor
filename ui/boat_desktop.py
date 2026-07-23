@@ -21,7 +21,7 @@ from engine import (
     TideFormatter, ReportFormatter, SafetyReportFormatter, StatusUIConfig
 )
 from services.analysis import BoatDataService
-from ui.desktopcharts import render_all_desktop_graphs
+from ui.desktop_charts import render_all_desktop_graphs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,7 +30,10 @@ logging.basicConfig(
 logger = logging.getLogger("BoatSafetyApp")
 
 class BoatSafetyApp:
-    """アプリケーションのメインクラス。"""
+    """
+    アプリケーションのメインクラス。
+    UI全体の初期化、イベントハンドリング、非同期データ処理の連携を管理する。
+    """
     
     def __init__(self, window_root: tk.Tk):
         self.root = window_root
@@ -49,16 +52,23 @@ class BoatSafetyApp:
         self.style.configure("Treeview.Heading", font=("Yu Gothic UI", 10, "bold"))
 
     def _create_layout(self):
+        self._create_header_area()
+        self._create_date_area()
+        self._create_result_area()
+        self._create_graph_area()
+
+    def _create_header_area(self):
+        """
+        ヘッダー部分のUI部品を作成する。
+        """
         header = tk.Frame(self.root, bg="#0b4f6c", height=65)
         header.pack(fill="x")
         
-        # タイトル調整用の空ラベル
+        # タイトル配置のバランスをとるため空のウィジェットを配置
         tk.Label(header, width=5, bg="#0b4f6c").pack(side="left") 
         
-        # タイトル
         tk.Label(header, text="🚤 ボート出港判定", bg="#0b4f6c", fg="white", font=("Yu Gothic UI", 18, "bold")).pack(side="left", expand=True, pady=15)
         
-        # メニューボタン追加
         self.menu_btn = tk.Button(
             header, text="≡", bg="#0b4f6c", fg="white", font=("Yu Gothic UI", 20), 
             relief="flat", cursor="hand2", command=self.show_menu_popup
@@ -67,6 +77,10 @@ class BoatSafetyApp:
         
         tk.Label(self.root, text="※相模川河口の潮位・潮汐・風速・風向・波高・うねりを総合評価", bg="#eef3f8", fg="#555555", font=("Yu Gothic UI", 9, "italic")).pack(pady=(5, 5))
 
+    def _create_date_area(self):
+        """
+        判定日の選択および実行ボタン部分のUIを作成する。
+        """
         weekdays = ["月", "火", "水", "木", "金", "土", "日"]
         date_frame = tk.LabelFrame(self.root, text=" 判定日 ", bg="white", padx=10, pady=5)
         date_frame.pack(fill="x", padx=20, pady=5)
@@ -90,6 +104,10 @@ class BoatSafetyApp:
         )
         self.submit_btn.pack(pady=12)
 
+    def _create_result_area(self):
+        """
+        判定結果のサマリーパネルおよび潮位情報部分を作成する。
+        """
         status_panel = tk.Frame(self.root, bg="white", bd=1, relief="solid")
         status_panel.pack(fill="x", padx=20, pady=5)
 
@@ -103,11 +121,13 @@ class BoatSafetyApp:
         self.tide_info_label = tk.Label(self.root, text="", bg="#eef3f8", fg="#444444", font=("Yu Gothic UI", 9, "bold"))
         self.tide_info_label.pack(pady=2)
 
-        # 1. 既存の notebook 作成部分はそのまま
+    def _create_graph_area(self):
+        """
+        詳細データおよび各種グラフを表示するタブ・ツリービュー領域を作成する。
+        """
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True, padx=20, pady=(5, 15))
 
-        # 2. タブを3つ定義する
         self.table_tab = tk.Frame(self.notebook)
         self.notebook.add(self.table_tab, text="📊 判定結果")
         
@@ -120,7 +140,6 @@ class BoatSafetyApp:
         self.tide_tab = tk.Frame(self.notebook)
         self.notebook.add(self.tide_tab, text="🌊 潮位グラフ")
 
-        # 3. Treeview の親を self.table_tab に設定
         COLUMNS = ("time", "status", "direction", "wind", "wave", "tide")
         TABLE_HEADERS = {"time": "時間", "status": "判定", "direction": "風向", "wind": "風速", "wave": "波浪", "tide": "潮位"}
        
@@ -185,7 +204,6 @@ class BoatSafetyApp:
             for row in display_rows_filtered:
                 self.result_tree.insert("", "end", values=(row.time_range, row.status, row.direction, row.wind, row.wave, row.tide), tags=(row.tag,))
 
-            # グラフ描画を別モジュールから呼び出し
             render_all_desktop_graphs(self.wind_tab, self.wave_tab, self.tide_tab, hour_data)
 
             ui_data = SafetyReportFormatter.get_ui_summary_data(summary)
@@ -201,6 +219,9 @@ class BoatSafetyApp:
         messagebox.showerror("致命的エラー", f"非同期判定タスクの駆動中にエラーが検出されました:\n{err_msg}")
 
     def show_menu_popup(self):
+        """
+        メイン画面右上のハンバーガーメニューからポップアップメニューを表示する。
+        """
         menu = tk.Menu(self.root, tearoff=0, font=("Yu Gothic UI", 10))
         
         menu.add_command(label="⚖ 判定基準", command=self._show_safety_criteria)
@@ -283,6 +304,9 @@ class BoatSafetyApp:
 
 
 def run_boat_desktop():
+    """
+    デスクトップアプリケーションを起動するエントリポイント。
+    """
     main_window = tk.Tk()
     app = BoatSafetyApp(main_window)
     main_window.mainloop()

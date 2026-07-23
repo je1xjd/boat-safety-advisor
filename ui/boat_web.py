@@ -2,6 +2,7 @@
 boat_web.py
 
 Streamlitを用いたWeb版の出港判定アプリケーション。
+相模川河口の海況データを視覚的に確認するためのUIを提供する。
 """
 import sys
 import os
@@ -10,7 +11,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-# --- パス操作をimportの後に行う ---
+# 自作モジュールをインポートするため、親ディレクトリをパスに追加する
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from dataclasses import asdict
@@ -24,9 +25,9 @@ from engine.formatter import (
     TideFormatter
 )
 from engine.utils import summarize_daytime_weather, SunCalculator
-from ui.webcharts import extract_number, draw_fixed_chart
+from ui.web_charts import extract_number, draw_fixed_chart
 
-# ページ設定
+# アプリケーションの基本レイアウトとタイトルを設定する
 st.set_page_config(
     page_title="相模川河口 海況安全判定",
     page_icon="🚤",
@@ -34,57 +35,68 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ページ状態の初期化
+# セッション状態の初期化が行われていない場合、ホーム画面をデフォルトに設定する
 if "current_page" not in st.session_state:
     st.session_state.current_page = "home"
 
-# --- サイドバーメニュー ---
-with st.sidebar:
-    st.header("≡ メニュー")
-    if st.button("🚤 出港判定", width='stretch'):
-        st.session_state.current_page = "home"
-        st.rerun()
+def _create_menu():
+    """
+    アプリケーションのサイドバーメニューを描画・制御する。
+    """
+    with st.sidebar:
+        st.header("≡ メニュー")
+        if st.button("🚤 出港判定", width='stretch'):
+            st.session_state.current_page = "home"
+            st.rerun()
 
-    # 判定基準確認ボタン（ページ遷移として定義）
-    if st.button("⚖ 判定基準", width='stretch'):
-        st.session_state.current_page = "criteria"
-        st.rerun()
+        if st.button("⚖ 判定基準", width='stretch'):
+            st.session_state.current_page = "criteria"
+            st.rerun()
 
-    st.divider()
-    st.subheader("🚀 出港前")
-    if st.button("下架前チェック", width='stretch'):
-        st.session_state.current_page = "pre_lower"
-        st.rerun()
-    if st.button("下架後チェック", width='stretch'):
-        st.session_state.current_page = "post_lower"
-        st.rerun()
+        st.divider()
+        st.subheader("🚀 出港前")
+        if st.button("下架前チェック", width='stretch'):
+            st.session_state.current_page = "pre_lower"
+            st.rerun()
+        if st.button("下架後チェック", width='stretch'):
+            st.session_state.current_page = "post_lower"
+            st.rerun()
 
-    st.divider()
-    st.subheader("⚓ 帰港後")
-    if st.button("上架前チェック", width='stretch'):
-        st.session_state.current_page = "pre_lift"
-        st.rerun()
-    if st.button("上架後チェック", width='stretch'):
-        st.session_state.current_page = "post_lift"
-        st.rerun()
-        
-    st.divider()
-    if st.button("⚙ 設定", width='stretch'):
-        st.session_state.current_page = "settings"
-        st.rerun()
+        st.divider()
+        st.subheader("⚓ 帰港後")
+        if st.button("上架前チェック", width='stretch'):
+            st.session_state.current_page = "pre_lift"
+            st.rerun()
+        if st.button("上架後チェック", width='stretch'):
+            st.session_state.current_page = "post_lift"
+            st.rerun()
+            
+        st.divider()
+        if st.button("⚙ 設定", width='stretch'):
+            st.session_state.current_page = "settings"
+            st.rerun()
 
-    st.divider()
-    st.caption("相模川河口 海況安全判定アプリ")
+        st.divider()
+        st.caption("相模川河口 海況安全判定アプリ")
+
+# --- サイドバーメニュー描画の実行 ---
+_create_menu()
 
 # --- 関数定義 ---
 @st.cache_data(ttl=600)
 def load_all_data(target_date):
+    """
+    指定された日付の海況解析データを取得する（キャッシュ有効期間: 600秒）。
+    """
     return BoatDataService.get_full_analysis(target_date)
 
 def render_summary_card(
     result_text, result_color, weather_text, temp_max, temp_min,
     max_window, before_str, after_str, tide_text, umi_info
 ):
+    """
+    判定結果の総合サマリー情報を視覚的なカード形式で描画する。
+    """
     st.markdown(f'<div style="text-align:center; font-size:56px; font-weight:bold; color:{result_color}; padding:10px;">{result_text}</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="text-align:center; font-size:22px; color:#0b4f84; font-weight:bold;">{weather_text} | 【<span style="color: #e74c3c;">{temp_max:.0f}℃</span> / <span style="color: #3498db;">{temp_min:.0f}℃</span>】</div>', unsafe_allow_html=True)
     if int(max_window[2]) > 0:
@@ -94,6 +106,9 @@ def render_summary_card(
     st.markdown(f'<div style="background:#e9ecef; border:1px solid #808080; padding:10px; text-align:center; font-size:15px; font-weight:bold; color:#333; margin-top:8px; border-radius:2px;">{tide_text}</div>', unsafe_allow_html=True)
 
 def highlight_status(row):
+    """
+    データフレームの行ごとの判定ステータスに応じて背景色のスタイルを返す。
+    """
     return [f'background-color: {StatusFormatter.get_status_color(row["判定"])}'] * len(row)
 
 
@@ -147,11 +162,9 @@ elif st.session_state.current_page == "home":
         with st.spinner("データ取得中..."):
             st.session_state.analysis_result = load_all_data(target_date)
 
-    # 判定結果がある場合の描画順序を変更
     if "analysis_result" in st.session_state and st.session_state.analysis_result:
         result = st.session_state.analysis_result
         
-        # 1. 上部に総合サマリー（出港判定、天気、連続活動枠、潮位情報バー）を表示
         ui_data = SafetyReportFormatter.get_ui_summary_data(result.summary)
         render_summary_card(
             ui_data["label"], ui_data["color"], 
@@ -163,7 +176,6 @@ elif st.session_state.current_page == "home":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 2. 共通データの構築（テーブル用・グラフ用）をタブ表示の「前」に行う
         table_rows = SafetyReportFormatter.build_table_rows(result.hour_data, *SunCalculator.get_sun_times(result.umi_info))
         all_rows = ReportFormatter.build_display_rows(table_rows)
         display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)
@@ -171,7 +183,6 @@ elif st.session_state.current_page == "home":
         df = pd.DataFrame([asdict(row) for row in display_rows_filtered])
         df = df.rename(columns={"time_range": "時間", "status": "判定", "direction": "風向", "wind": "風速", "wave": "波浪", "tide": "潮位"})
         
-        # グラフ用の数値を正しく抽出したデータフレームを作成
         graph_data_list = []
         for k, v in result.hour_data.items():
             if SafetyRule.ACTIVITY_START_HOUR <= int(k) <= SafetyRule.ACTIVITY_END_HOUR:
@@ -183,13 +194,12 @@ elif st.session_state.current_page == "home":
                 })
         df_graph = pd.DataFrame(graph_data_list)
 
-        # 3. タブを配置
         tab1, tab_wind, tab_wave, tab_tide = st.tabs(["📊 判定結果", "🍃 風速グラフ", "🌊 波高グラフ", "🚢 潮位グラフ"])
         
         with tab1:
             st.table(df[["時間", "判定", "風向", "風速", "波浪", "潮位"]].style.apply(highlight_status, axis=1))
 
-        # CSSでグラフへのマウス入力を完全に無効化
+        # Streamlitの仕様によるグラフ操作を無効化するためのCSS設定
         st.markdown("""
         <style>
         [data-testid="stVegaLiteChart"] {
