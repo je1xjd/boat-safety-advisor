@@ -28,20 +28,35 @@ logger = logging.getLogger(__name__)
 
 
 class MarineWeatherClient:
-    """外部ソースから海況データを取得・集約するクライアント。"""
+    """
+    外部ソースから海況データを取得・集約するクライアント。
+    """
 
     _session = None
 
     @classmethod
     def get_session(cls) -> requests.Session:
-        """シングルトンHTTPセッションを返し、存在しなければ生成する。"""
+        """
+        シングルトンHTTPセッションを返し、存在しなければ生成する。
+
+        Returns:
+            requests.Session: 共有HTTPセッション
+        """
         if cls._session is None:
             cls._session = cls.create_robust_session()
         return cls._session
 
     @staticmethod
     def fetch_all_data(date_obj: date) -> tuple[Any, Any, Any]:
-        """各データ取得処理を並列実行し、結果をタプルで返す。"""
+        """
+        各データ取得処理を並列実行し、結果をタプルで返す。
+
+        Parameters:
+            date_obj (date): 取得対象日
+
+        Returns:
+            tuple[Any, Any, Any]: (天気データ, 潮位データ, 潮汐・日出没情報)
+        """
         date_str = date_obj.strftime("%Y-%m-%d")
         
         with ThreadPoolExecutor(max_workers=3) as pool:
@@ -52,7 +67,12 @@ class MarineWeatherClient:
 
     @staticmethod
     def create_robust_session() -> requests.Session:
-        """リトライ機能を備えた高信頼性HTTPセッションを生成する。"""
+        """
+        リトライ機能を備えた高信頼性HTTPセッションを生成する。
+
+        Returns:
+            requests.Session: 設定済みセッション
+        """
         session = requests.Session()
         session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BoatSafetyClient/3.0"})
     
@@ -70,7 +90,6 @@ class MarineWeatherClient:
 
     @staticmethod
     def _fetch_weather_raw(target_date_str: str) -> tuple[dict, dict]:
-        """Open-Meteoの天気・海洋APIから生データを並列取得する。"""
         weather_url = "https://api.open-meteo.com/v1/forecast"
         weather_params = {
             "latitude": SafetyRule.LATITUDE, "longitude": SafetyRule.LONGITUDE,
@@ -100,10 +119,8 @@ class MarineWeatherClient:
             weather_future = executor.submit(fetch_weather)
             marine_future = executor.submit(fetch_marine)
 
-        # 天気データは必須（例外は呼び出し元でキャッチ）
         w_data = weather_future.result()
         
-        # 海洋データは失敗しても警告のみで補完する
         m_data = {}
         try:
             m_data = marine_future.result()
@@ -114,7 +131,6 @@ class MarineWeatherClient:
 
     @staticmethod
     def _convert_forecast(w_data: dict, m_data: dict) -> WeatherReport:
-        """取得した生データを解析し、WeatherReportオブジェクトに変換する。"""
         hourly_data = w_data.get("hourly", {})
         daily_data = w_data.get("daily", {})
     
@@ -128,7 +144,6 @@ class MarineWeatherClient:
     
         daily_weather = daily_data.get("weather_code", [None])[0]
 
-        # 7時から18時までの時間別気温を取得してフィルタリング・算出する
         hourly_temps = hourly_data.get("temperature_2m", [None] * 24)
         target_temps = [
             hourly_temps[h] for h in range(len(hourly_temps))
@@ -157,7 +172,15 @@ class MarineWeatherClient:
 
     @staticmethod
     def get_marine_weather(target_date_str: str) -> WeatherReport | None:
-        """Open-Meteo APIより大気・海洋データを取得し、構造化されたレポートを返す。"""
+        """
+        Open-Meteo APIより大気・海洋データを取得し、構造化されたレポートを返す。
+
+        Parameters:
+            target_date_str (str): 取得対象日 ("YYYY-MM-DD")
+
+        Returns:
+            WeatherReport | None: 気象・海洋レポート、失敗時はNone
+        """
         try:
             w_data, m_data = MarineWeatherClient._fetch_weather_raw(target_date_str)
             return MarineWeatherClient._convert_forecast(w_data, m_data)
@@ -167,7 +190,15 @@ class MarineWeatherClient:
 
     @staticmethod
     def get_tide_data(target_date: date) -> tuple[list, list, list]:
-        """気象庁の天文潮位表から毎時潮位と潮汐イベント時刻を抽出する。"""
+        """
+        気象庁の天文潮位表から毎時潮位と潮汐イベント時刻を抽出する。
+
+        Parameters:
+            target_date (date): 取得対象日
+
+        Returns:
+            tuple[list, list, list]: (毎時潮位のリスト, 満潮時刻のリスト(分), 干潮時刻のリスト(分))
+        """
         tide_list = [None] * 24
         year_str = target_date.strftime("%Y")
         url = f"{SafetyRule.JMA_TIDE_BASE_URL}/{year_str}/{SafetyRule.TIDE_STATION_CODE}.txt"
@@ -210,6 +241,14 @@ class MarineWeatherClient:
 
     @staticmethod
     def get_umitenki_tide_info(target_date: date) -> UmiInfo:
-        """海天気.jpから情報を取得し、パースして結果を返す。[cite: 3]"""
+        """
+        海天気.jpから情報を取得し、パースして結果を返す[cite: 3]。
+
+        Parameters:
+            target_date (date): 取得対象日
+
+        Returns:
+            UmiInfo: 潮汐・日出没などの海洋情報オブジェクト
+        """
         html_text = WeatherAPI.fetch_text(SafetyRule.UMITENKI_BASE_URL)
         return WeatherScraper.parse_umitenki_html(html_text, target_date)
