@@ -32,11 +32,11 @@ def draw_fixed_chart(
     line = alt.Chart(df).mark_line(point=True, color=color).encode(
         x=alt.X("時間:Q", 
                 title="時刻", 
-                scale=alt.Scale(domain=[SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR]),
+                scale=alt.Scale(domain=[SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR-1]),
                 axis=alt.Axis(
                     format="d", 
-                    tickCount=SafetyRule.ACTIVITY_END_HOUR - SafetyRule.ACTIVITY_START_HOUR + 1,
-                    values=list(range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR + 1))
+                    tickCount=SafetyRule.ACTIVITY_END_HOUR - SafetyRule.ACTIVITY_START_HOUR,
+                    values=list(range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR))
                 )
         ), 
         y=alt.Y(f"{y_col}:Q", title=y_col, scale=alt.Scale(**y_scale_args))
