@@ -144,7 +144,7 @@ class ReportFormatter:
         """辞書リストをUIRowオブジェクトのリストへ変換する。"""
         return [
             UIRow(
-                time_range=f"{r['hour']:02d}-{r['hour'] + 1:02d}",
+                time_range=f"{r['hour']:02d}",
                 status=r["status"],
                 direction=r["direction"],
                 wind=r["wind_text"],

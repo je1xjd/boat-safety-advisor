@@ -27,8 +27,7 @@ class SafetyRule:
     DIR_SOUTH_WEST: float = 247.5
 
     ACTIVITY_START_HOUR: int = 7
-    ACTIVITY_END_HOUR: int = 18
-    FETCH_END_HOUR: int = 19
+    ACTIVITY_END_HOUR: int = 19
     REQUIRED_SAFE_HOURS: int = 3
 
     WIND_LIMIT_CRITICAL: float = 5.5
