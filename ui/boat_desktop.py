@@ -196,8 +196,8 @@ class BoatSafetyApp:
             self.weather_label.config(text=f"{daytime_summary} | 【{weather_info.temp_max:.0f}℃ / {weather_info.temp_min:.0f}℃】")
 
             self.result_tree.delete(*self.result_tree.get_children())
-            sunrise_hour, sunset_hour = SunCalculator.get_sun_times(umi_info)
-            table_rows = SafetyReportFormatter.build_table_rows(hour_data, sunrise_hour, sunset_hour)
+            sunrise_time, sunset_time = SunCalculator.get_sun_times(umi_info)
+            table_rows = SafetyReportFormatter.build_table_rows(hour_data, sunrise_time, sunset_time)
 
             all_rows = ReportFormatter.build_display_rows(table_rows)
             display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)

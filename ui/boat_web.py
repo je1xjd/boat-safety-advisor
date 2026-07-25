@@ -176,7 +176,9 @@ elif st.session_state.current_page == "home":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        table_rows = SafetyReportFormatter.build_table_rows(result.hour_data, *SunCalculator.get_sun_times(result.umi_info))
+        sunrise_time, sunset_time = SunCalculator.get_sun_times(result.umi_info)
+        table_rows = SafetyReportFormatter.build_table_rows(result.hour_data, sunrise_time, sunset_time)
+
         all_rows = ReportFormatter.build_display_rows(table_rows)
         display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)
         
