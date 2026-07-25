@@ -5,6 +5,7 @@ formatter.py
 """
 
 import logging
+import datetime
 from dataclasses import dataclass
 
 from engine.models import HourForecast
@@ -75,21 +76,21 @@ class SafetyReportFormatter:
     def build_table_rows(
         cls,
         hour_data: dict,
-        sunrise_hour: int,
-        sunset_hour: int
+        sunrise_time: datetime.time | None,
+        sunset_time: datetime.time | None
     ) -> list:
-        """気象データに基づき、テーブル表示用の行データを生成する。"""
-        BoatSafetyEngine.apply_sequence_rules(hour_data, sunrise_hour, sunset_hour)
+        """気象データに基づき、テーブル表示用の行データを生成する（分単位の日出入対応）。"""
+        BoatSafetyEngine.apply_sequence_rules(hour_data, sunrise_time, sunset_time)
 
         rows = []
         for hour in sorted(hour_data.keys()):
-            rows.append(cls._format_row(hour, hour_data[hour], sunrise_hour, sunset_hour))
+            rows.append(cls._format_row(hour, hour_data[hour], sunrise_time, sunset_time))
         return rows
 
     @staticmethod
-    def _format_row(hour: int, data: object, sunrise_hour: int, sunset_hour: int) -> dict:
-        """単一時間帯のデータをUI表示用辞書に整形する。"""
-        status, tag = BoatSafetyEngine.get_display_status(hour, data, sunrise_hour, sunset_hour)
+    def _format_row(hour: int, data: object, sunrise_time: datetime.time | None, sunset_time: datetime.time | None) -> dict:
+        """単一時間帯のデータをUI表示用辞書に整形する（分単位の日出入対応）。"""
+        status, tag = BoatSafetyEngine.get_display_status(hour, data, sunrise_time, sunset_time)
         
         return {
             "hour": hour,
@@ -165,4 +166,3 @@ class ReportFormatter:
             row for row in rows 
             if int(row.time_range.split('-')[0]) <= SafetyRule.ACTIVITY_END_HOUR
         ]
-

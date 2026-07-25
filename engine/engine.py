@@ -5,6 +5,7 @@ engine.py
 物理的限界値および運用ルールに基づき、海況ステータスを算出する。
 """
 
+import datetime
 from .models import UmiInfo, HourForecast, AnalysisResult, AnalysisSummary
 from .rules import SafetyRule
 from .tide import TideJudge
@@ -58,8 +59,8 @@ class BoatSafetyEngine:
         """航行可能な時間帯の候補を算出し、潮位による制約でフィルタリングする。"""
         valid_windows = []
         
-        for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
-            for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS, SafetyRule.ACTIVITY_END_HOUR):
+        for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR + 1):
+            for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS, SafetyRule.ACTIVITY_END_HOUR+ 1):
 
                 if not (hour_data[start_hour].is_safe and hour_data[end_hour].is_safe):
                             continue
@@ -95,10 +96,18 @@ class BoatSafetyEngine:
         return valid_windows, before_candidates, after_candidates
 
     @classmethod
-    def get_display_status(cls, hour: int, data: object, sunrise_hour: int, sunset_hour: int) -> tuple[str, str]:
-        """UI表示用の海況ステータスとカラーカテゴリを返す。"""
-        if not (sunrise_hour <= hour < sunset_hour):
-            return ("日没" if hour >= sunset_hour else "夜明"), "danger"
+    def get_display_status(cls, hour: int, data: object, sunrise_time: datetime.time | None, sunset_time: datetime.time | None) -> tuple[str, str]:
+        """UI表示用の海況ステータスとカラーカテゴリを返す（分単位の日出入対応）。"""
+        is_daytime = False
+        if sunrise_time is not None and sunset_time is not None:
+            target_time = datetime.time(hour, 0)
+            is_daytime = (sunrise_time <= target_time < sunset_time)
+        else:
+            is_daytime = (6 <= hour < 18)
+
+        if not is_daytime:
+            sunset_h = sunset_time.hour if sunset_time else 18
+            return ("日没" if hour >= sunset_h else "夜明"), "danger"
 
         if data.is_safe:
             return "安全", "safe"
@@ -164,13 +173,18 @@ class BoatSafetyEngine:
         return True
 
     @classmethod
-    def apply_sequence_rules(cls, hour_data: dict, sunrise_hour: int, sunset_hour: int):
-        """時間帯ごとの物理的安全性と潮位低下によるリスクをシーケンスで判定する。"""
+    def apply_sequence_rules(cls, hour_data: dict, sunrise_time: datetime.time | None, sunset_time: datetime.time | None):
+        """時間帯ごとの物理的安全性と潮位低下によるリスクをシーケンスで判定する（分単位の日出入対応）。"""
         hours = sorted(hour_data.keys())
         
         for hour in hours:
             data = hour_data[hour]
-            is_time_ok = (sunrise_hour <= hour < sunset_hour)
+            if sunrise_time is not None and sunset_time is not None:
+                target_time = datetime.time(hour, 0)
+                is_time_ok = (sunrise_time <= target_time < sunset_time)
+            else:
+                is_time_ok = (6 <= hour < 18)
+                
             data.is_safe = is_time_ok and data.wind_wave_safe
             data.is_tide_warning = False
 
