@@ -59,7 +59,7 @@ class BoatSafetyEngine:
         valid_windows = []
         
         for start_hour in range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR):
-            for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS - 1, SafetyRule.ACTIVITY_END_HOUR):
+            for end_hour in range(start_hour + SafetyRule.REQUIRED_SAFE_HOURS, SafetyRule.ACTIVITY_END_HOUR):
 
                 if not (hour_data[start_hour].is_safe and hour_data[end_hour].is_safe):
                             continue
@@ -73,19 +73,24 @@ class BoatSafetyEngine:
                         break
                 
                 if all_navigable:
-                    duration = end_hour - start_hour + 1
-                    valid_windows.append((start_hour, end_hour + 1, duration))
+                    duration = end_hour - start_hour
+                    valid_windows.append((start_hour, end_hour, duration))
         
         low_hours = [h for h, data in hour_data.items() if data.is_tide_low()]
     
         if low_hours:
             first_low = min(low_hours)
             last_low = max(low_hours)
-            before_candidates = [w for w in valid_windows if w[1] <= first_low]
+            before_candidates = [w for w in valid_windows if w[1] < first_low]
             after_candidates = [w for w in valid_windows if w[0] > last_low]
         else:
             before_candidates = valid_windows
             after_candidates = []
+
+        required = SafetyRule.REQUIRED_SAFE_HOURS
+        before_candidates = [w for w in before_candidates if w[2] >= required]
+        after_candidates = [w for w in after_candidates if w[2] >= required]
+
 
         return valid_windows, before_candidates, after_candidates
 
@@ -114,13 +119,15 @@ class BoatSafetyEngine:
 
         if before_candidates:
             best_b = max(before_candidates, key=lambda x: x[2])
-            before_str = f"{best_b[0]:02d}-{best_b[1]:02d}時"
+            if best_b[2] >= SafetyRule.REQUIRED_SAFE_HOURS:
+                before_str = f"{best_b[0]:02d}-{best_b[1]:02d}時"
 
         after_str = "該当なし"
 
         if after_candidates:
             best_a = max(after_candidates, key=lambda x: x[2])
-            after_str = f"{best_a[0]:02d}-{best_a[1]:02d}時"
+            if best_a[2] >= SafetyRule.REQUIRED_SAFE_HOURS:
+               after_str = f"{best_a[0]:02d}-{best_a[1]:02d}時"
 
         return before_str, after_str
 

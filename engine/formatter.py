@@ -45,9 +45,9 @@ class StatusFormatter:
     @staticmethod
     def get_status_color(status_text: str) -> str:
         """判定文字列から対応する背景色を返す。"""
-        if any(kw in status_text for kw in ["危険", "不可"]):
+        if any(kw in status_text for kw in ["危険", "不可", "夜明", "日没"]):
             return "#f8d7da"
-        if any(kw in status_text for kw in ["注意", "潮位", "夜明", "日没"]):
+        if any(kw in status_text for kw in ["注意", "潮位"]):
             return "#fff3cd"
         if "安全" in status_text:
             return "#d4edda"
@@ -163,6 +163,6 @@ class ReportFormatter:
         """
         return [
             row for row in rows 
-            if int(row.time_range.split('-')[0]) < SafetyRule.ACTIVITY_END_HOUR
+            if int(row.time_range.split('-')[0]) <= SafetyRule.ACTIVITY_END_HOUR
         ]
 
