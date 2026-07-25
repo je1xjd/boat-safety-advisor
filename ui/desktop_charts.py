@@ -51,8 +51,8 @@ def render_all_desktop_graphs(wind_tab, wave_tab, tide_tab, hour_data):
         ax.set_xlabel("時刻")
         ax.set_ylabel(ylabel)
         
-        ax.set_xlim(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR-1)
-        ax.set_xticks(range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR))
+        ax.set_xlim(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR)
+        ax.set_xticks(range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR + 1))
         ax.set_ylim(0, y_lim)
         
         ax.grid(True, linestyle='--', color='#DDDDDD', linewidth=0.5, axis='both')
