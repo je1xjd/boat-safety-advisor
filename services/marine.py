@@ -168,6 +168,7 @@ class MarineWeatherClient:
             daily_weather_code=daily_weather,
             temp_max=temp_max,
             temp_min=temp_min,
+            temperature=hourly_temps,
         )
 
     @staticmethod
