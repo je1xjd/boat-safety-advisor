@@ -59,6 +59,18 @@ class NavigationAnalyzer:
         swell_period = weather_info.swell_period[hour]
         tide_val = tide_data[hour]
 
+        precipitation_probability = getattr(weather_info, 'precipitation_probability', None)
+        if precipitation_probability and len(precipitation_probability) > hour:
+            precipitation_probability = precipitation_probability[hour]
+        else:
+            precipitation_probability = None
+
+        temperature = getattr(weather_info, 'temperature', None)
+        if temperature and len(temperature) > hour:
+            temperature = temperature[hour]
+        else:
+            temperature = None
+
         wind_wave_ok = BoatSafetyEngine.judge_wind_wave_only(
             hour, wind_speed, wind_dir, wave_height, swell_period, high_tides, low_tides
         )
@@ -91,12 +103,14 @@ class NavigationAnalyzer:
             wind_wave_safe=wind_wave_ok,
             is_safe=total_ok,
             is_navigable=is_navigable,
-            dir_kanji=WindJudge.degrees_to_direction(wind_dir)
+            dir_kanji=WindJudge.degrees_to_direction(wind_dir),
+            precipitation_probability=precipitation_probability,
+            temperature=temperature
         )
 
     @classmethod
     def build_navigation_summary(cls, hour_data) -> AnalysisSummary:
-        """航行可能な時間帯を抽出し、総合的な分析サマリーを作成する。[cite: 4]"""
+        """航行可能な時間帯を抽出し、総合的な分析サマリーを作成する。"""
 
         valid_windows, before_c, after_c = (
             BoatSafetyEngine.calculate_valid_windows(hour_data)

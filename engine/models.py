@@ -31,6 +31,7 @@ class WeatherReport:
     daily_weather_code: int | None
     temp_max: float
     temp_min: float
+    temperature: list[float | None] = None  
 
 @dataclass
 class HourForecast:
@@ -45,6 +46,8 @@ class HourForecast:
     is_navigable: bool = False
     dir_kanji: str = "不明"
     is_tide_warning: bool = False
+    precipitation_probability: float | None = None  
+    temperature: float | None = None                 
 
     def get_status_tag(self) -> str:
         """ステータスに応じたUIタグを返す。"""

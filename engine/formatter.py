@@ -89,21 +89,32 @@ class SafetyReportFormatter:
 
     @staticmethod
     def _format_row(hour: int, data: object, sunrise_time: datetime.time | None, sunset_time: datetime.time | None) -> dict:
-        """単一時間帯のデータをUI表示用辞書に整形する（分単位の日出入対応）。"""
+        """単一時間帯のデータをUI表示用辞書に整形する（潮位の右側に降水・気温を配置）。"""
         status, tag = BoatSafetyEngine.get_display_status(hour, data, sunrise_time, sunset_time)
         
+        # 降水確率の整数四捨五入
+        precip_text = "取得失敗"
+        if hasattr(data, 'precipitation_probability') and data.precipitation_probability is not None:
+            precip_text = f"{round(data.precipitation_probability, -1):.0f}%"
+        elif hasattr(data, 'precip_prob') and data.precip_prob is not None:
+            precip_text = f"{round(data.precip_prob, -1):.0f}%"
+        # 気温のフォーマット
+        temp_text = "取得失敗"
+        if hasattr(data, 'temperature') and data.temperature is not None:
+            temp_text = f"{data.temperature:.0f}℃"
+        elif hasattr(data, 'temp') and data.temp is not None:
+            temp_text = f"{data.temp:.0f}℃"
+
         return {
             "hour": hour,
             "status": status,
             "tag": tag,
             "direction": data.dir_kanji,
-            "wind_text": f"{data.wind_speed:.1f} m/s" if data.wind_speed is not None else "取得失敗",
-            "wave_text": (
-                f"{data.wave_height:.2f}m / {data.swell_period:.1f}s"
-                if data.wave_height is not None and data.swell_period is not None
-                else "取得失敗"
-            ),
-            "tide_text": f"{int(data.tide)} cm" if data.tide is not None else "取得失敗"
+            "wind_text": f"{data.wind_speed:.1f}m/s" if data.wind_speed is not None else "取得失敗",
+            "wave_text": f"{data.wave_height:.2f}m" if data.wave_height is not None else "取得失敗",  
+            "tide_text": f"{int(data.tide)}cm" if data.tide is not None else "取得失敗",             
+            "precip_text": precip_text,  
+            "temp_text": temp_text,      
         }
 
     @staticmethod
@@ -135,6 +146,8 @@ class UIRow:
     wind: str
     wave: str
     tide: str
+    precip: str
+    temp: str
     tag: str
 
 class ReportFormatter:
@@ -151,6 +164,8 @@ class ReportFormatter:
                 wind=r["wind_text"],
                 wave=r["wave_text"],
                 tide=r["tide_text"],
+                precip=r["precip_text"],
+                temp=r["temp_text"],
                 tag=r.get("tag", "normal")
             )
             for r in table_rows
