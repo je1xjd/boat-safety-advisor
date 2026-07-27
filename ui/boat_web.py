@@ -183,7 +183,16 @@ elif st.session_state.current_page == "home":
         display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)
         
         df = pd.DataFrame([asdict(row) for row in display_rows_filtered])
-        df = df.rename(columns={"time_range": "時間", "status": "判定", "direction": "風向", "wind": "風速", "wave": "波浪", "tide": "潮位"})
+        df = df.rename(columns={
+            "time_range": "時間", 
+            "status": "判定", 
+            "direction": "風向", 
+            "wind": "風速", 
+            "wave": "波高", 
+            "tide": "潮位",
+            "precip": "降水",
+            "temp": "気温"
+        })
         
         graph_data_list = []
         for k, v in result.hour_data.items():
@@ -199,7 +208,7 @@ elif st.session_state.current_page == "home":
         tab1, tab_wind, tab_wave, tab_tide = st.tabs(["📊 判定結果", "🍃 風速グラフ", "🌊 波高グラフ", "🚢 潮位グラフ"])
         
         with tab1:
-            st.table(df[["時間", "判定", "風向", "風速", "波浪", "潮位"]].style.apply(highlight_status, axis=1))
+            st.table(df[["時間", "判定", "風向", "風速", "波高", "潮位", "降水", "気温"]].style.apply(highlight_status, axis=1))
 
         # Streamlitの仕様によるグラフ操作を無効化するためのCSS設定
         st.markdown("""

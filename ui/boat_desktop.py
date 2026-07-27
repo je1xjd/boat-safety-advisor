@@ -140,13 +140,23 @@ class BoatSafetyApp:
         self.tide_tab = tk.Frame(self.notebook)
         self.notebook.add(self.tide_tab, text="🌊 潮位グラフ")
 
-        COLUMNS = ("time", "status", "direction", "wind", "wave", "tide")
-        TABLE_HEADERS = {"time": "時間", "status": "判定", "direction": "風向", "wind": "風速", "wave": "波浪", "tide": "潮位"}
+        COLUMNS = ("time", "status", "direction", "wind", "wave", "tide", "precip", "temp")
+        TABLE_HEADERS = {
+            "time": "時間", 
+            "status": "判定", 
+            "direction": "風向", 
+            "wind": "風速", 
+            "wave": "波高", 
+            "tide": "潮位",
+            "precip": "降水",
+            "temp": "気温"
+        }
        
         self.result_tree = ttk.Treeview(self.table_tab, columns=COLUMNS, show="headings", height=12)
         for col_key, header_title in TABLE_HEADERS.items():
             self.result_tree.heading(col_key, text=header_title)
-            self.result_tree.column(col_key, width=135, anchor="center", stretch=True)
+            width = 85 if col_key in ("precip", "temp") else 110
+            self.result_tree.column(col_key, width=width, anchor="center", stretch=True)
 
         tree_scroll = ttk.Scrollbar(self.table_tab, orient="vertical", command=self.result_tree.yview)
         self.result_tree.configure(yscrollcommand=tree_scroll.set)
@@ -202,7 +212,11 @@ class BoatSafetyApp:
             all_rows = ReportFormatter.build_display_rows(table_rows)
             display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)
             for row in display_rows_filtered:
-                self.result_tree.insert("", "end", values=(row.time_range, row.status, row.direction, row.wind, row.wave, row.tide), tags=(row.tag,))
+                self.result_tree.insert(
+                    "", "end", 
+                    values=(row.time_range, row.status, row.direction, row.wind, row.wave, row.tide, row.precip, row.temp), 
+                    tags=(row.tag,)
+                )
 
             render_all_desktop_graphs(self.wind_tab, self.wave_tab, self.tide_tab, hour_data)
 
