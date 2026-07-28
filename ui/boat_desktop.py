@@ -140,6 +140,9 @@ class BoatSafetyApp:
         self.tide_tab = tk.Frame(self.notebook)
         self.notebook.add(self.tide_tab, text="🌊 潮位グラフ")
 
+        self.precip_tab = tk.Frame(self.notebook)
+        self.notebook.add(self.precip_tab, text="☔ 降水・気温")
+
         COLUMNS = ("time", "status", "direction", "wind", "wave", "tide", "precip", "temp")
         TABLE_HEADERS = {
             "time": "時間", 
@@ -218,7 +221,7 @@ class BoatSafetyApp:
                     tags=(row.tag,)
                 )
 
-            render_all_desktop_graphs(self.wind_tab, self.wave_tab, self.tide_tab, hour_data)
+            render_all_desktop_graphs(self.wind_tab, self.wave_tab, self.tide_tab, self.precip_tab, hour_data)
 
             ui_data = SafetyReportFormatter.get_ui_summary_data(summary)
             self.result_label.config(text=f" {ui_data['label']}", fg=ui_data['color'])

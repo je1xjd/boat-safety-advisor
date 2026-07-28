@@ -25,7 +25,7 @@ from engine.formatter import (
     TideFormatter
 )
 from engine.utils import summarize_daytime_weather, SunCalculator
-from ui.web_charts import extract_number, draw_fixed_chart
+from ui.web_charts import extract_number, draw_fixed_chart, draw_precip_temp_chart
 
 # アプリケーションの基本レイアウトとタイトルを設定する
 st.set_page_config(
@@ -194,30 +194,39 @@ elif st.session_state.current_page == "home":
             "temp": "気温"
         })
         
+        # グラフ用のデータフレームを作成（降水確率と気温、および判定ステータスを含める）
         graph_data_list = []
         for k, v in result.hour_data.items():
             if SafetyRule.ACTIVITY_START_HOUR <= int(k) <= SafetyRule.ACTIVITY_END_HOUR:
+                # 該当時間の判定結果を取得（辞書型として安全にアクセス）
+                status_str = "安全"
+                for row_item in table_rows:
+                    # row_item が dict 型かオブジェクト型かに応じて安全に判定
+                    h_val = row_item.get("hour") if isinstance(row_item, dict) else getattr(row_item, "hour", None)
+                    if h_val == int(k):
+                        status_str = row_item.get("status") if isinstance(row_item, dict) else getattr(row_item, "status", "安全")
+                        break
+                
                 graph_data_list.append({
                     "時間": int(k),
                     "風速": v.wind_speed if v.wind_speed is not None else 0.0,
                     "波高": extract_number(v.wave_height),
-                    "潮位": extract_number(v.tide)
+                    "潮位": extract_number(v.tide),
+                    "降水確率": v.precipitation_probability if hasattr(v, "precipitation_probability") and v.precipitation_probability is not None else 0.0,
+                    "気温": v.temperature if hasattr(v, "temperature") and v.temperature is not None else 20.0,
+                    "判定": status_str
                 })
         df_graph = pd.DataFrame(graph_data_list)
 
-        tab1, tab_wind, tab_wave, tab_tide = st.tabs(["📊 判定結果", "🍃 風速グラフ", "🌊 波高グラフ", "🚢 潮位グラフ"])
+        tab1, tab_wind, tab_wave, tab_tide, tab_precip_temp = st.tabs([
+            "📊 判定結果", "🍃 風速", "🌊 波高", "🚢 潮位", "🌧 降水・気温"
+        ])
         
         with tab1:
-            st.table(df[["時間", "判定", "風向", "風速", "波高", "潮位", "降水", "気温"]].style.apply(highlight_status, axis=1))
-
-        # Streamlitの仕様によるグラフ操作を無効化するためのCSS設定
-        st.markdown("""
-        <style>
-        [data-testid="stVegaLiteChart"] {
-            pointer-events: none;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+            st.dataframe(
+                df[["時間", "判定", "風向", "風速", "波高", "潮位", "降水", "気温"]].style.apply(highlight_status, axis=1), 
+                width='stretch'
+            )
 
         with tab_wind:
             st.subheader("風速 (m/s)")
@@ -252,5 +261,12 @@ elif st.session_state.current_page == "home":
                     limit_label="最低潮位",
                     y_max=SafetyRule.TIDE_Y_LIMIT
                 ), 
+                width='stretch'
+            )
+
+        with tab_precip_temp:
+            st.subheader("降水確率 ＆ 気温")
+            st.altair_chart(
+                draw_precip_temp_chart(df_graph), 
                 width='stretch'
             )
