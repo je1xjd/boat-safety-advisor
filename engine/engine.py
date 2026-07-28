@@ -213,7 +213,7 @@ class BoatSafetyEngine:
                 target_time = datetime.time(hour, 0)
                 is_time_ok = sunrise_time <= target_time < sunset_time
             else:
-                is_time_ok = 6 <= hour < 18
+                is_time_ok = 6 <= hour <= 18
 
             data.is_safe = is_time_ok and data.wind_wave_safe
             data.is_tide_warning = False
