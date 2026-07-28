@@ -226,7 +226,8 @@ elif st.session_state.current_page == "home":
             st.dataframe(
                 df[["時間", "判定", "風向", "風速", "波高", "潮位", "降水", "気温"]].style.apply(highlight_status, axis=1), 
                 width='stretch',
-                hide_index=True
+                hide_index=True,
+                height=480
             )
 
         with tab_wind:
