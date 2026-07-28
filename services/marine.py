@@ -5,24 +5,22 @@ marine.py
 """
 
 import logging
-import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, date
+from datetime import date
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 from engine import (
-    AnalysisResult, BoatSafetyEngine, NavigationAnalyzer,
-    SafetyRule, TideJudge, UmiInfo, WeatherReport,
-    WaveJudge, WindJudge, WindWaveEvaluator
+    SafetyRule,
+    UmiInfo,
+    WeatherReport,
 )
 
-from .weather import WeatherAPI
 from .scraper import WeatherScraper
+from .weather import WeatherAPI
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +56,20 @@ class MarineWeatherClient:
             tuple[Any, Any, Any]: (天気データ, 潮位データ, 潮汐・日出没情報)
         """
         date_str = date_obj.strftime("%Y-%m-%d")
-        
+
         with ThreadPoolExecutor(max_workers=3) as pool:
-            weather_future = pool.submit(MarineWeatherClient.get_marine_weather, date_str)
+            weather_future = pool.submit(
+                MarineWeatherClient.get_marine_weather, date_str
+            )
             tide_future = pool.submit(MarineWeatherClient.get_tide_data, date_obj)
-            umi_info_future = pool.submit(MarineWeatherClient.get_umitenki_tide_info, date_obj)            
-            return weather_future.result(), tide_future.result(), umi_info_future.result()
+            umi_info_future = pool.submit(
+                MarineWeatherClient.get_umitenki_tide_info, date_obj
+            )
+            return (
+                weather_future.result(),
+                tide_future.result(),
+                umi_info_future.result(),
+            )
 
     @staticmethod
     def create_robust_session() -> requests.Session:
@@ -74,15 +80,19 @@ class MarineWeatherClient:
             requests.Session: 設定済みセッション
         """
         session = requests.Session()
-        session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BoatSafetyClient/3.0"})
-    
+        session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BoatSafetyClient/3.0"
+            }
+        )
+
         retries = Retry(
             total=5,
             backoff_factor=1.0,
             status_forcelist=[500, 502, 503, 504],
-            raise_on_status=False
+            raise_on_status=False,
         )
-    
+
         adapter = HTTPAdapter(max_retries=retries)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
@@ -92,26 +102,36 @@ class MarineWeatherClient:
     def _fetch_weather_raw(target_date_str: str) -> tuple[dict, dict]:
         weather_url = "https://api.open-meteo.com/v1/forecast"
         weather_params = {
-            "latitude": SafetyRule.LATITUDE, "longitude": SafetyRule.LONGITUDE,
+            "latitude": SafetyRule.LATITUDE,
+            "longitude": SafetyRule.LONGITUDE,
             "hourly": "wind_speed_10m,wind_direction_10m,weather_code,precipitation_probability,temperature_2m",
             "daily": "weather_code",
-            "timezone": "Asia/Tokyo", "start_date": target_date_str, "end_date": target_date_str
+            "timezone": "Asia/Tokyo",
+            "start_date": target_date_str,
+            "end_date": target_date_str,
         }
-    
+
         marine_url = "https://marine-api.open-meteo.com/v1/marine"
         marine_params = {
-            "latitude": SafetyRule.LATITUDE, "longitude": SafetyRule.LONGITUDE,
+            "latitude": SafetyRule.LATITUDE,
+            "longitude": SafetyRule.LONGITUDE,
             "hourly": "wave_height,swell_wave_period",
-            "timezone": "Asia/Tokyo", "start_date": target_date_str, "end_date": target_date_str
+            "timezone": "Asia/Tokyo",
+            "start_date": target_date_str,
+            "end_date": target_date_str,
         }
 
         def fetch_weather():
-            res = MarineWeatherClient.get_session().get(weather_url, params=weather_params, timeout=10)
+            res = MarineWeatherClient.get_session().get(
+                weather_url, params=weather_params, timeout=10
+            )
             res.raise_for_status()
             return res.json()
 
         def fetch_marine():
-            res = MarineWeatherClient.get_session().get(marine_url, params=marine_params, timeout=10)
+            res = MarineWeatherClient.get_session().get(
+                marine_url, params=marine_params, timeout=10
+            )
             res.raise_for_status()
             return res.json()
 
@@ -120,7 +140,7 @@ class MarineWeatherClient:
             marine_future = executor.submit(fetch_marine)
 
         w_data = weather_future.result()
-        
+
         m_data = {}
         try:
             m_data = marine_future.result()
@@ -133,21 +153,24 @@ class MarineWeatherClient:
     def _convert_forecast(w_data: dict, m_data: dict) -> WeatherReport:
         hourly_data = w_data.get("hourly", {})
         daily_data = w_data.get("daily", {})
-    
+
         raw_winds = hourly_data.get("wind_speed_10m", [None] * 24)
         wind_speed_ms = [(v / 3.6 if v is not None else None) for v in raw_winds]
-    
+
         wind_dirs = hourly_data.get("wind_direction_10m", [None] * 24)
         weather_codes = hourly_data.get("weather_code", [None] * 24)
         times = hourly_data.get("time", [""] * 24)
         precip_probs = hourly_data.get("precipitation_probability", [0] * 24)
-    
+
         daily_weather = daily_data.get("weather_code", [None])[0]
 
         hourly_temps = hourly_data.get("temperature_2m", [None] * 24)
         target_temps = [
-            hourly_temps[h] for h in range(len(hourly_temps))
-            if SafetyRule.ACTIVITY_START_HOUR <= h <= SafetyRule.ACTIVITY_END_HOUR and h < len(hourly_temps) and hourly_temps[h] is not None
+            hourly_temps[h]
+            for h in range(len(hourly_temps))
+            if SafetyRule.ACTIVITY_START_HOUR <= h <= SafetyRule.ACTIVITY_END_HOUR
+            and h < len(hourly_temps)
+            and hourly_temps[h] is not None
         ]
 
         temp_max = max(target_temps) if target_temps else 0.0
@@ -208,31 +231,50 @@ class MarineWeatherClient:
             response = MarineWeatherClient.get_session().get(url, timeout=10)
             response.raise_for_status()
             lines = response.text.splitlines()
-            target_token = target_date.strftime("%y") + f"{target_date.month:2}" + f"{target_date.day:2}"
+            target_token = (
+                target_date.strftime("%y")
+                + f"{target_date.month:2}"
+                + f"{target_date.day:2}"
+            )
 
             for line in lines:
-                if len(line) < 80: continue
-                if line[72:78] == target_token and line[78:80].strip() == SafetyRule.TIDE_STATION_CODE:
+                if len(line) < 80:
+                    continue
+                if (
+                    line[72:78] == target_token
+                    and line[78:80].strip() == SafetyRule.TIDE_STATION_CODE
+                ):
                     temp_tides = []
                     for h_idx in range(24):
                         start = h_idx * 3
-                        val_str = line[start:start+3].strip()
-                        temp_tides.append(None if (val_str == "999" or not val_str) else float(val_str))
-                
-                    if len(temp_tides) == 24: tide_list = temp_tides
+                        val_str = line[start : start + 3].strip()
+                        temp_tides.append(
+                            None
+                            if (val_str == "999" or not val_str)
+                            else float(val_str)
+                        )
+
+                    if len(temp_tides) == 24:
+                        tide_list = temp_tides
 
                     high_tide_minutes = []
                     low_tide_minutes = []
                     for i in range(4):
                         p_high = 80 + (i * 7)
-                        r_high = line[p_high:p_high+4]
+                        r_high = line[p_high : p_high + 4]
                         if r_high.strip() and "9999" not in r_high:
-                            high_tide_minutes.append(int(r_high.replace(" ", "0")[:2]) * 60 + int(r_high.replace(" ", "0")[2:]))
-                    
+                            high_tide_minutes.append(
+                                int(r_high.replace(" ", "0")[:2]) * 60
+                                + int(r_high.replace(" ", "0")[2:])
+                            )
+
                         p_low = 108 + (i * 7)
-                        r_low = line[p_low:p_low+4]
+                        r_low = line[p_low : p_low + 4]
                         if r_low.strip() and "9999" not in r_low:
-                            low_tide_minutes.append(int(r_low.replace(" ", "0")[:2]) * 60 + int(r_low.replace(" ", "0")[2:]))
+                            low_tide_minutes.append(
+                                int(r_low.replace(" ", "0")[:2]) * 60
+                                + int(r_low.replace(" ", "0")[2:])
+                            )
 
                     return tide_list, high_tide_minutes, low_tide_minutes
         except Exception as e:

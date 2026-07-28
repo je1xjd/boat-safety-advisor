@@ -7,10 +7,13 @@ WebサイトからのHTML解析・データ抽出サービス。
 import logging
 import re
 from datetime import date
+
 from bs4 import BeautifulSoup
+
 from engine.models import UmiInfo
 
 logger = logging.getLogger(__name__)
+
 
 class WeatherScraper:
     """HTMLから海象・潮汐情報を抽出する。"""
@@ -25,7 +28,9 @@ class WeatherScraper:
             # 日付ブロックの特定
             target_text = ""
             for block in soup.select("div.weather_14days_box"):
-                if date_query in (block.select_one("div.weather_14days_date") or "").get_text(""):
+                if date_query in (
+                    block.select_one("div.weather_14days_date") or ""
+                ).get_text(""):
                     target_text = block.get_text()
                     break
 
