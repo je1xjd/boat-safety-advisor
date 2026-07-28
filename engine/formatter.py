@@ -4,21 +4,22 @@ formatter.py
 各種判定結果および生データを、UI表示に適した形式へ整形する。
 """
 
-import logging
 import datetime
+import logging
 from dataclasses import dataclass
 
-from engine.models import HourForecast
-from engine.rules import SafetyRule
 from engine.engine import BoatSafetyEngine
+from engine.rules import SafetyRule
 
 logger = logging.getLogger(__name__)
 
+
 class StatusUIConfig:
     """判定ステータスに応じた表示スタイルとラベルを管理する。"""
+
     MAPPING = {
-        "safe":     {"color": "#1a7f37", "label": "出港可能"},
-        "danger":   {"color": "#c62828", "label": "出港不可"}
+        "safe": {"color": "#1a7f37", "label": "出港可能"},
+        "danger": {"color": "#c62828", "label": "出港不可"},
     }
 
     @staticmethod
@@ -26,6 +27,7 @@ class StatusUIConfig:
         """指定されたステータスに対するスタイル設定を返す。"""
         target = "danger" if status == "tide_low" else status
         return StatusUIConfig.MAPPING.get(target, {"color": "#000000", "label": "不明"})
+
 
 class TideFormatter:
     """潮汐情報の表示用テキスト整形を行う。"""
@@ -35,14 +37,17 @@ class TideFormatter:
         """潮汐情報をUI表示用の文字列にフォーマットする。"""
         if not umi_info or umi_info.tide_name == "不明":
             return "潮汐情報: 取得失敗"
-        return (f"🌀 {umi_info.tide_name} "
-                f"(満潮 {umi_info.high_tide} ／ 干潮 {umi_info.low_tide})   "
-                f"🌗 月齢: {umi_info.moon_age}   "
-                f"🌅 日出: {umi_info.sun_rise} ／ 日入: {umi_info.sun_set}")
+        return (
+            f"🌀 {umi_info.tide_name} "
+            f"(満潮 {umi_info.high_tide} ／ 干潮 {umi_info.low_tide})   "
+            f"🌗 月齢: {umi_info.moon_age}   "
+            f"🌅 日出: {umi_info.sun_rise} ／ 日入: {umi_info.sun_set}"
+        )
+
 
 class StatusFormatter:
     """判定結果をUI表示用スタイル（背景色）へ変換する。"""
-    
+
     @staticmethod
     def get_status_color(status_text: str) -> str:
         """判定文字列から対応する背景色を返す。"""
@@ -54,6 +59,7 @@ class StatusFormatter:
             return "#d4edda"
         return "#ffffff"
 
+
 class SafetyReportFormatter:
     """分析サマリーおよび時系列データの整形を担当する。"""
 
@@ -63,46 +69,54 @@ class SafetyReportFormatter:
         is_available = summary.is_available
         status = "safe" if is_available else "danger"
         style = StatusUIConfig.get_style(status)
-        
+
         text = SafetyReportFormatter.build_summary_text(summary)
-        
-        return {
-            "text": text,
-            "label": style["label"],
-            "color": style["color"]
-        }
+
+        return {"text": text, "label": style["label"], "color": style["color"]}
 
     @classmethod
     def build_table_rows(
         cls,
         hour_data: dict,
         sunrise_time: datetime.time | None,
-        sunset_time: datetime.time | None
+        sunset_time: datetime.time | None,
     ) -> list:
         """気象データに基づき、テーブル表示用の行データを生成する（分単位の日出入対応）。"""
         BoatSafetyEngine.apply_sequence_rules(hour_data, sunrise_time, sunset_time)
 
         rows = []
         for hour in sorted(hour_data.keys()):
-            rows.append(cls._format_row(hour, hour_data[hour], sunrise_time, sunset_time))
+            rows.append(
+                cls._format_row(hour, hour_data[hour], sunrise_time, sunset_time)
+            )
         return rows
 
     @staticmethod
-    def _format_row(hour: int, data: object, sunrise_time: datetime.time | None, sunset_time: datetime.time | None) -> dict:
+    def _format_row(
+        hour: int,
+        data: object,
+        sunrise_time: datetime.time | None,
+        sunset_time: datetime.time | None,
+    ) -> dict:
         """単一時間帯のデータをUI表示用辞書に整形する（潮位の右側に降水・気温を配置）。"""
-        status, tag = BoatSafetyEngine.get_display_status(hour, data, sunrise_time, sunset_time)
-        
+        status, tag = BoatSafetyEngine.get_display_status(
+            hour, data, sunrise_time, sunset_time
+        )
+
         # 降水確率の整数四捨五入
         precip_text = "取得失敗"
-        if hasattr(data, 'precipitation_probability') and data.precipitation_probability is not None:
+        if (
+            hasattr(data, "precipitation_probability")
+            and data.precipitation_probability is not None
+        ):
             precip_text = f"{round(data.precipitation_probability, -1):.0f}%"
-        elif hasattr(data, 'precip_prob') and data.precip_prob is not None:
+        elif hasattr(data, "precip_prob") and data.precip_prob is not None:
             precip_text = f"{round(data.precip_prob, -1):.0f}%"
         # 気温のフォーマット
         temp_text = "取得失敗"
-        if hasattr(data, 'temperature') and data.temperature is not None:
+        if hasattr(data, "temperature") and data.temperature is not None:
             temp_text = f"{data.temperature:.0f}℃"
-        elif hasattr(data, 'temp') and data.temp is not None:
+        elif hasattr(data, "temp") and data.temp is not None:
             temp_text = f"{data.temp:.0f}℃"
 
         return {
@@ -110,11 +124,15 @@ class SafetyReportFormatter:
             "status": status,
             "tag": tag,
             "direction": data.dir_kanji,
-            "wind_text": f"{data.wind_speed:.1f}m/s" if data.wind_speed is not None else "取得失敗",
-            "wave_text": f"{data.wave_height:.2f}m" if data.wave_height is not None else "取得失敗",  
-            "tide_text": f"{int(data.tide)}cm" if data.tide is not None else "取得失敗",             
-            "precip_text": precip_text,  
-            "temp_text": temp_text,      
+            "wind_text": f"{data.wind_speed:.1f}m/s"
+            if data.wind_speed is not None
+            else "取得失敗",
+            "wave_text": f"{data.wave_height:.2f}m"
+            if data.wave_height is not None
+            else "取得失敗",
+            "tide_text": f"{int(data.tide)}cm" if data.tide is not None else "取得失敗",
+            "precip_text": precip_text,
+            "temp_text": temp_text,
         }
 
     @staticmethod
@@ -137,9 +155,11 @@ class SafetyReportFormatter:
             f"後半: {summary.after_str}]"
         )
 
+
 @dataclass
 class UIRow:
     """テーブル表示用の行データモデル。"""
+
     time_range: str
     status: str
     direction: str
@@ -149,6 +169,7 @@ class UIRow:
     precip: str
     temp: str
     tag: str
+
 
 class ReportFormatter:
     """UI表示用整形クラス。"""
@@ -166,7 +187,7 @@ class ReportFormatter:
                 tide=r["tide_text"],
                 precip=r["precip_text"],
                 temp=r["temp_text"],
-                tag=r.get("tag", "normal")
+                tag=r.get("tag", "normal"),
             )
             for r in table_rows
         ]
@@ -178,6 +199,7 @@ class ReportFormatter:
         要件: 7-8時から17-18時までの11行のみを返す。
         """
         return [
-            row for row in rows 
-            if int(row.time_range.split('-')[0]) <= SafetyRule.ACTIVITY_END_HOUR
+            row
+            for row in rows
+            if int(row.time_range.split("-")[0]) <= SafetyRule.ACTIVITY_END_HOUR
         ]

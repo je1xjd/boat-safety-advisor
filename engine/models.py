@@ -5,12 +5,14 @@ models.py
 """
 
 from dataclasses import dataclass
-from typing import List, Optional
+
 from engine.rules import SafetyRule
+
 
 @dataclass
 class UmiInfo:
     """潮汐・月齢・日出入情報。"""
+
     tide_name: str = "不明"
     high_tide: str = "--"
     low_tide: str = "--"
@@ -18,9 +20,11 @@ class UmiInfo:
     sun_rise: str = "--"
     sun_set: str = "--"
 
+
 @dataclass
 class WeatherReport:
     """気象・海象データのコンテナ。"""
+
     times: list[str]
     wind_speed: list[float | None]
     wind_direction: list[float | None]
@@ -31,11 +35,13 @@ class WeatherReport:
     daily_weather_code: int | None
     temp_max: float
     temp_min: float
-    temperature: list[float | None] = None  
+    temperature: list[float | None] = None
+
 
 @dataclass
 class HourForecast:
     """1時間ごとの気象・海象および安全性判定結果を保持する。"""
+
     wind_speed: float | None
     wind_dir: float | None
     wave_height: float | None
@@ -46,8 +52,8 @@ class HourForecast:
     is_navigable: bool = False
     dir_kanji: str = "不明"
     is_tide_warning: bool = False
-    precipitation_probability: float | None = None  
-    temperature: float | None = None                 
+    precipitation_probability: float | None = None
+    temperature: float | None = None
 
     def get_status_tag(self) -> str:
         """ステータスに応じたUIタグを返す。"""
@@ -61,17 +67,21 @@ class HourForecast:
         """現在の潮位が航行基準値未満か判定する。"""
         return (self.tide or 0) < SafetyRule.MIN_TIDE_CM
 
+
 @dataclass(frozen=True)
 class AnalysisSummary:
     """1日分の航行可能時間帯に関する総合判定サマリー。"""
+
     is_available: bool
     best_window: tuple[int, int, int]
     before_str: str
     after_str: str
 
+
 @dataclass(frozen=True)
 class AnalysisResult:
     """解析プロセス全体の結果一式。"""
+
     hour_data: dict
     summary: AnalysisSummary
     weather_info: WeatherReport

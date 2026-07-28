@@ -6,6 +6,7 @@ wind.py
 
 from .rules import SafetyRule
 
+
 class WindJudge:
     """風に関する安全判定ロジックを提供する。"""
 
@@ -13,8 +14,22 @@ class WindJudge:
     def degrees_to_direction(deg: float) -> str:
         """風向（度）を16方位の文字列に変換する。"""
         directions = [
-            "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東",
-            "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"
+            "北",
+            "北北東",
+            "北東",
+            "東北東",
+            "東",
+            "東南東",
+            "南東",
+            "南南東",
+            "南",
+            "南南西",
+            "南西",
+            "西南西",
+            "西",
+            "西北西",
+            "北西",
+            "北北西",
         ]
         return directions[int((deg + 11.25) / 22.5) % 16]
 
@@ -24,7 +39,9 @@ class WindJudge:
         return SafetyRule.SOUTH_WIND_START <= wind_dir <= SafetyRule.SOUTH_WIND_END
 
     @staticmethod
-    def get_limit(is_ebb: bool, is_south: bool, is_under_operational_limit: bool) -> float:
+    def get_limit(
+        is_ebb: bool, is_south: bool, is_under_operational_limit: bool
+    ) -> float:
         """潮流と風向の状況を組み合わせ、運航可能な風速上限値を算出する。"""
         if is_ebb and is_south:
             return SafetyRule.WIND_LIMIT_CRITICAL
@@ -39,6 +56,6 @@ class WindJudge:
             return True
 
         return (
-            wind_speed <= limit + SafetyRule.WIND_OVERRIDE_MARGIN and
-            wave_height < SafetyRule.WIND_OVERRIDE_WAVE_HEIGHT
+            wind_speed <= limit + SafetyRule.WIND_OVERRIDE_MARGIN
+            and wave_height < SafetyRule.WIND_OVERRIDE_WAVE_HEIGHT
         )
