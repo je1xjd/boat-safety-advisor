@@ -99,16 +99,17 @@ class BoatSafetyEngine:
     def get_display_status(cls, hour: int, data: object, sunrise_time: datetime.time | None, sunset_time: datetime.time | None) -> tuple[str, str]:
         """UI表示用の海況ステータスとカラーカテゴリを返す（分単位の日出入対応）。"""
         is_daytime = False
-        if sunrise_time is not None and sunset_time is not None:
+        has_sun_times = (sunrise_time is not None and sunset_time is not None)
+
+        if has_sun_times:
             target_time = datetime.time(hour, 0)
             is_daytime = (sunrise_time <= target_time < sunset_time)
-        else:
-            is_daytime = (6 <= hour < 18)
-
-        if not is_daytime:
-            sunset_h = sunset_time.hour if sunset_time else 18
-            return ("日没" if hour >= sunset_h else "夜明"), "danger"
-
+            
+            # 日出入データがある場合のみ、時間外を「日没」「夜明」として扱う
+            if not is_daytime:
+                sunset_h = sunset_time.hour
+                return ("日没" if hour >= sunset_h else "夜明"), "danger"
+        
         if data.is_safe:
             return "安全", "safe"
         
