@@ -127,25 +127,16 @@ class BoatSafetyEngine:
         sunset_time: datetime.time | None,
     ) -> tuple[str, str]:
         """UI表示用の海況ステータスとカラーカテゴリを返す（分単位の日出入対応）。"""
-        is_daytime = False
-        has_sun_times = sunrise_time is not None and sunset_time is not None
+        # 7時〜18時の間は、日出入の細かい時刻に関わらず日中（時間内）として優先的に扱う
+        if 7 <= hour <= 18:
+            if data.is_safe:
+                return "安全", "safe"
+            if getattr(data, "is_tide_warning", False):
+                return "潮位", "tide_low"
+            return "危険", "danger"
 
-        if has_sun_times:
-            target_time = datetime.time(hour, 0)
-            is_daytime = sunrise_time <= target_time < sunset_time
-
-            # 日出入データがある場合のみ、時間外を「日没」「夜明」として扱う
-            if not is_daytime:
-                sunset_h = sunset_time.hour
-                return ("日没" if hour >= sunset_h else "夜明"), "danger"
-
-        if data.is_safe:
-            return "安全", "safe"
-
-        if getattr(data, "is_tide_warning", False):
-            return "潮位", "tide_low"
-
-        return "危険", "danger"
+        # 7時未満、19時以降の時間帯のみ日没・夜明とする
+        return ("日没" if hour > 18 else "夜明"), "danger"
 
     @classmethod
     def build_before_after_summary(
@@ -213,7 +204,7 @@ class BoatSafetyEngine:
                 target_time = datetime.time(hour, 0)
                 is_time_ok = sunrise_time <= target_time < sunset_time
             else:
-                is_time_ok = 6 <= hour <= 18
+                is_time_ok = 7 <= hour <= 18
 
             data.is_safe = is_time_ok and data.wind_wave_safe
             data.is_tide_warning = False
