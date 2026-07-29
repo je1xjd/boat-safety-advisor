@@ -115,7 +115,7 @@ class SafetyReportFormatter:
         # 気温のフォーマット
         temp_text = "取得失敗"
         if hasattr(data, "temperature") and data.temperature is not None:
-            temp_text = f"{data.temperature:.0f}℃"
+            temp_text = f"{data.temperature:.1f}℃"
         elif hasattr(data, "temp") and data.temp is not None:
             temp_text = f"{data.temp:.0f}℃"
 
