@@ -46,6 +46,27 @@ class BoatSafetyApp:
         self._create_layout()
         self.menu_win = None
 
+        # ガベージコレクション時のスレッド競合（RuntimeError）を防ぐため画像参照を保持するリスト
+        self.active_images = []
+
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self):
+        """アプリ終了時にスレッドプールとグラフリソースを安全にシャットダウンして破棄する"""
+        try:
+            self.executor.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
+
+        try:
+            from ui.desktop_charts import dispose_desktop_graphs
+            dispose_desktop_graphs()
+        except Exception:
+            pass
+
+        self.root.destroy()
+
     def _setup_styles(self):
         self.style = ttk.Style(self.root)
         self.style.theme_use("clam")
@@ -65,7 +86,6 @@ class BoatSafetyApp:
         header = tk.Frame(self.root, bg="#0b4f6c", height=65)
         header.pack(fill="x")
 
-        # タイトル配置のバランスをとるため空のウィジェットを配置
         tk.Label(header, width=5, bg="#0b4f6c").pack(side="left")
 
         tk.Label(
@@ -112,7 +132,6 @@ class BoatSafetyApp:
 
         for i in range(8):
             d = today_jst + datetime.timedelta(days=i)
-            date_str = f"{d.strftime('%Y-%m-%d')}({weekdays[d.weekday()] * 0 or weekdays[d.weekday()]})"
             date_options.append(f"{d.strftime('%Y-%m-%d')}({weekdays[d.weekday()]})")
 
         self.date_combobox = ttk.Combobox(
@@ -252,8 +271,8 @@ class BoatSafetyApp:
             self.result_tree.delete(item)
 
         target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d").date()
-        executor = ThreadPoolExecutor(max_workers=1)
-        executor.submit(self._async_fetch_and_judge, target_date_str, target_date)
+        
+        self.executor.submit(self._async_fetch_and_judge, target_date_str, target_date)
 
     def _async_fetch_and_judge(
         self, target_date_str: str, target_date: datetime.date
@@ -315,9 +334,16 @@ class BoatSafetyApp:
                     tags=(row.tag,),
                 )
 
-            render_all_desktop_graphs(
+            # 古い画像参照をクリアしてから新しいグラフ描画結果の画像を保持する
+            self.active_images.clear()
+            rendered = render_all_desktop_graphs(
                 self.wind_tab, self.wave_tab, self.tide_tab, self.precip_tab, hour_data
             )
+            if rendered:
+                if isinstance(rendered, (list, tuple)):
+                    self.active_images.extend(rendered)
+                else:
+                    self.active_images.append(rendered)
 
             ui_data = SafetyReportFormatter.get_ui_summary_data(summary)
             self.result_label.config(text=f" {ui_data['label']}", fg=ui_data["color"])
@@ -371,53 +397,6 @@ class BoatSafetyApp:
         y = self.menu_btn.winfo_rooty() + self.menu_btn.winfo_height()
         menu.post(x, y)
 
-    def _open_checklist(self, section_key, title):
-        top = tk.Toplevel(self.root)
-        top.title(title)
-        top.geometry("350x600")
-
-        tk.Button(top, text="閉じる", command=top.destroy, bg="#eeeeee").pack(
-            fill="x", pady=5
-        )
-
-        frame = tk.Frame(top)
-        frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        scrollbar = tk.Scrollbar(frame, orient="vertical")
-        listbox = tk.Listbox(
-            frame,
-            yscrollcommand=scrollbar.set,
-            selectmode="extended",
-            font=("Yu Gothic UI", 12),
-        )
-
-        scrollbar.config(command=listbox.yview)
-        scrollbar.pack(side="right", fill="y")
-        listbox.pack(side="left", fill="both", expand=True)
-
-        items = get_rule_content(section_key)
-        for item in items:
-            listbox.insert("end", "☐ " + item)
-
-        def on_select(event):
-            index = listbox.curselection()
-            if index:
-                item = listbox.get(index[0])
-                if item.startswith("☐"):
-                    listbox.delete(index[0])
-                    listbox.insert(index[0], "☑ " + item[2:])
-                else:
-                    listbox.delete(index[0])
-                    listbox.insert(index[0], "☐ " + item[2:])
-                listbox.selection_clear(0, "end")
-
-        listbox.bind("<<ListboxSelect>>", on_select)
-
-    def _show_safety_criteria(self):
-        top = tk.Toplevel(self.root)
-        top.title("ボート出港安全基準")
-        top.geometry("450x600")
-
     def _create_checklist_widgets(
         self, top, listbox, scrollbar, items, is_criteria=False
     ):
@@ -443,16 +422,6 @@ class BoatSafetyApp:
             listbox.insert("end", item if is_criteria else "☐ " + item)
 
     def _open_checklist(self, section_key, title):
-        top = tk.Toplevel(self.root)
-        top.title(title)
-        top.geometry("350x600")
-
-        scrollbar = tk.Scrollbar(
-            tk.Frame(top), orient="vertical"
-        )  # プレースホルダー用だが既存構造を厳密に維持するため以下の通り定義
-        # 既存構造を完全に維持するため、元のインスタンス生成を維持して共通メソッドを呼び出す形にする
-        top.destroy()
-
         top = tk.Toplevel(self.root)
         top.title(title)
         top.geometry("350x600")

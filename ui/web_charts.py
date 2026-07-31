@@ -37,7 +37,7 @@ def draw_fixed_chart(
         .encode(
             x=alt.X(
                 "時間:Q",
-                title="時刻",
+                title="時間",
                 scale=alt.Scale(
                     domain=[
                         SafetyRule.ACTIVITY_START_HOUR,
@@ -59,7 +59,7 @@ def draw_fixed_chart(
             ),
             y=alt.Y(f"{y_col}:Q", title=y_col, scale=alt.Scale(**y_scale_args)),
             tooltip=[
-                alt.Tooltip("時間:Q", title="時刻", format="d"),
+                alt.Tooltip("時間:Q", title="時間", format="d"),
                 alt.Tooltip(f"{y_col}:Q", title=y_col, format=".1f"),
             ],
         )
@@ -101,7 +101,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
     # 共通のX軸設定
     x_enc = alt.X(
         "時間:Q",
-        title="時刻",
+        title="時間",
         scale=alt.Scale(
             domain=[SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR]
         ),
@@ -127,7 +127,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
                 axis=alt.Axis(grid=True, gridColor="#E0E0E0"),
             ),
             tooltip=[
-                alt.Tooltip("時間:Q", title="時刻", format="d"),
+                alt.Tooltip("時間:Q", title="時間", format="d"),
                 alt.Tooltip("降水確率:Q", title="降水確率", format=".0f"),
                 alt.Tooltip("判定:N", title="判定"),
             ],
@@ -161,7 +161,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
                 ),
             ),
             tooltip=[
-                alt.Tooltip("時間:Q", title="時刻", format="d"),
+                alt.Tooltip("時間:Q", title="時間", format="d"),
                 alt.Tooltip("気温:Q", title="気温", format=".1f"),
                 alt.Tooltip("判定:N", title="判定"),
             ],
