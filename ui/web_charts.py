@@ -129,7 +129,6 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
             tooltip=[
                 alt.Tooltip("時間:Q", title="時間", format="d"),
                 alt.Tooltip("降水確率:Q", title="降水確率", format=".0f"),
-                alt.Tooltip("判定:N", title="判定"),
             ],
         )
     )
@@ -163,7 +162,6 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
             tooltip=[
                 alt.Tooltip("時間:Q", title="時間", format="d"),
                 alt.Tooltip("気温:Q", title="気温", format=".1f"),
-                alt.Tooltip("判定:N", title="判定"),
             ],
         )
     )
