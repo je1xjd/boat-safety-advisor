@@ -9,8 +9,8 @@ import datetime
 # 絵文字と日本語名を紐付けた天気マッピング（3桁の天気コードに対応）
 WEATHER_MAPPING = {
     0: {"emoji": "☀️", "name": "晴れ"},
-    1: {"emoji": "🌤️", "name": "晴れ時々曇"},
-    2: {"emoji": "⛅", "name": "曇時々晴"},
+    1: {"emoji": "🌤️", "name": "晴れ時々曇り"},
+    2: {"emoji": "⛅", "name": "曇り時々晴れ"},
     3: {"emoji": "☁️", "name": "曇り"},
     45: {"emoji": "🌫️", "name": "霧"},
     48: {"emoji": "🌫️", "name": "霧氷"},
@@ -79,9 +79,6 @@ def summarize_daytime_weather(weather_codes: list[int], precip_probs: list[int])
                 return {"emoji": "⛈️", "name": "雷雨"}
             elif code in [71, 73, 75, 85]:
                 return {"emoji": "❄️", "name": "雪"}
-            else:
-                info = WEATHER_MAPPING.get(code, {"emoji": "☁️", "name": "曇り"})
-                return info
 
         m_base = get_base_weather(morning_main)
         a_base = get_base_weather(afternoon_main)
