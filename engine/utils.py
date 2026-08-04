@@ -101,7 +101,7 @@ def summarize_daytime_weather(weather_codes: list[int], precip_probs: list[int])
         if m_base["name"] == a_base["name"]:
             weather_str = f"{m_base['emoji']} {m_base['name']}"
         else:
-            weather_str = f"{m_base['emoji']}／{a_base['emoji']} {m_base['name']}のち{a_base['name']}"
+            weather_str = f"{m_base['emoji']}/{a_base['emoji']} {m_base['name']}のち{a_base['name']}"
 
     # 3. 午前・午後の最大降水確率をそれぞれ算出
     morning_precip = get_period_precip(*MORNING_RANGE)
