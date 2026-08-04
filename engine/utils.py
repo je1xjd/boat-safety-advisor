@@ -6,7 +6,7 @@ UI表示用の気象要約および時間計算ユーティリティ。
 
 import datetime
 
-# 絵文字と日本語名を紐付けた天気マッピング（3桁の天気コードに対応）
+# 絵文字と日本語名を紐付けた天気マッピング（WMO天気コードに準拠して網羅的に拡張）
 WEATHER_MAPPING = {
     0: {"emoji": "☀️", "name": "晴れ"},
     1: {"emoji": "🌤️", "name": "晴れ時々曇り"},
@@ -14,18 +14,28 @@ WEATHER_MAPPING = {
     3: {"emoji": "☁️", "name": "曇り"},
     45: {"emoji": "🌫️", "name": "霧"},
     48: {"emoji": "🌫️", "name": "霧氷"},
-    51: {"emoji": "🌦️", "name": "小雨"},
-    53: {"emoji": "🌧️", "name": "雨"},
-    55: {"emoji": "🌧️", "name": "強い雨"},
-    61: {"emoji": "🌧️", "name": "雨"},
+    51: {"emoji": "🌦️", "name": "小雨（霧雨）"},
+    53: {"emoji": "🌧️", "name": "雨（霧雨）"},
+    55: {"emoji": "🌧️", "name": "強い霧雨"},
+    56: {"emoji": "🌧️", "name": "凍結性霧雨"},
+    57: {"emoji": "🌧️", "name": "強い凍結性霧雨"},
+    61: {"emoji": "🌦️", "name": "小雨"},
     63: {"emoji": "🌧️", "name": "雨"},
-    65: {"emoji": "⛈️", "name": "大雨・雷"},
+    65: {"emoji": "⛈️", "name": "大雨"},
+    66: {"emoji": "🌧️", "name": "凍結性の雨"},
+    67: {"emoji": "⛈️", "name": "強い凍結性の雨"},
     71: {"emoji": "🌨️", "name": "小雪"},
     73: {"emoji": "❄️", "name": "雪"},
     75: {"emoji": "❄️", "name": "大雪"},
+    77: {"emoji": "🌨️", "name": "霧雪"},
     80: {"emoji": "🌦️", "name": "にわか雨"},
+    81: {"emoji": "🌧️", "name": "雨（にわか雨）"},
+    82: {"emoji": "⛈️", "name": "激しいにわか雨"},
     85: {"emoji": "🌨️", "name": "にわか雪"},
+    86: {"emoji": "❄️", "name": "強いにわか雪"},
     95: {"emoji": "⚡", "name": "雷雨"},
+    96: {"emoji": "⚡", "name": "雷雨（ひょう伴う）"},
+    99: {"emoji": "⚡", "name": "激しい雷雨（ひょう伴う）"},
 }
 
 
@@ -73,12 +83,17 @@ def summarize_daytime_weather(weather_codes: list[int], precip_probs: list[int])
                 return {"emoji": "☀️", "name": "晴れ"}
             elif code in [2, 3]:
                 return {"emoji": "☁️", "name": "曇り"}
-            elif code in [51, 53, 55, 61, 63, 80]:
+            elif code in [45, 48]:
+                return {"emoji": "🌫️", "name": "霧"}
+            elif code in [51, 53, 55, 56, 57, 61, 63, 66, 80, 81]:
                 return {"emoji": "🌧️", "name": "雨"}
-            elif code in [65, 95]:
+            elif code in [65, 67, 95, 96, 99]:
                 return {"emoji": "⛈️", "name": "雷雨"}
-            elif code in [71, 73, 75, 85]:
+            elif code in [71, 73, 75, 77, 85, 86]:
                 return {"emoji": "❄️", "name": "雪"}
+            else:
+                # 万が一定義外のコードが来た場合の安全なフォールバック
+                return WEATHER_MAPPING.get(code, {"emoji": "☁️", "name": "曇り"})
 
         m_base = get_base_weather(morning_main)
         a_base = get_base_weather(afternoon_main)
@@ -86,7 +101,7 @@ def summarize_daytime_weather(weather_codes: list[int], precip_probs: list[int])
         if m_base["name"] == a_base["name"]:
             weather_str = f"{m_base['emoji']} {m_base['name']}"
         else:
-            weather_str = f"{m_base['emoji']} {m_base['name']}のち{a_base['name']}"
+            weather_str = f"{m_base['emoji']}／{a_base['emoji']} {m_base['name']}のち{a_base['name']}"
 
     # 3. 午前・午後の最大降水確率をそれぞれ算出
     morning_precip = get_period_precip(*MORNING_RANGE)
