@@ -20,6 +20,7 @@ from dataclasses import asdict
 from engine import (
     SafetyRule,
     StatusFormatter,
+    WindJudge,
 )
 from engine.formatter import (
     ReportFormatter,
@@ -206,7 +207,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 df_graph,
                 "風速",
                 SafetyRule.WIND_COLOR,
-                limit_val=SafetyRule.WIND_LIMIT_NORMAL,
+                limit_val="制限風速",  # 💡 df_graph の列名を文字列で指定
                 limit_label="制限風速",
                 y_max=SafetyRule.WIND_Y_LIMIT,
             ),
@@ -220,7 +221,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 df_graph,
                 "波高",
                 SafetyRule.WAVE_COLOR,
-                limit_val=SafetyRule.MAX_WAVE_HEIGHT_NORMAL,
+                limit_val="制限波高",  # 💡 df_graph の列名を文字列で指定
                 limit_label="制限波高",
                 y_max=SafetyRule.WAVE_Y_LIMIT,
             ),
@@ -234,7 +235,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 df_graph,
                 "潮位",
                 SafetyRule.TIDE_COLOR,
-                limit_val=SafetyRule.MIN_TIDE_CM,
+                limit_val="制限潮位",
                 limit_label="最低潮位",
                 y_max=SafetyRule.TIDE_Y_LIMIT,
             ),
@@ -314,14 +315,12 @@ elif st.session_state.current_page == "home":
             }
         )
 
-        # グラフ用のデータフレームを作成（降水確率と気温、および判定ステータスを含める）
+        # グラフ用のデータフレームを作成（制限値の列も含める）
         graph_data_list = []
         for k, v in result.hour_data.items():
             if SafetyRule.ACTIVITY_START_HOUR <= int(k) <= SafetyRule.ACTIVITY_END_HOUR:
-                # 該当時間の判定結果を取得（辞書型として安全にアクセス）
                 status_str = "安全"
                 for row_item in table_rows:
-                    # row_item が dict 型かオブジェクト型かに応じて安全に判定
                     h_val = (
                         row_item.get("hour")
                         if isinstance(row_item, dict)
@@ -335,11 +334,23 @@ elif st.session_state.current_page == "home":
                         )
                         break
 
+                # 動的な制限値の算出
+                wind_dir = getattr(v, "wind_dir", 0) or 0
+                is_south = WindJudge.is_south_wind(wind_dir) if "WindJudge" in globals() or hasattr(WindJudge, "is_south_wind") else False
+                is_ebb = getattr(v, "is_ebb", False)
+                wave_h = extract_number(v.wave_height)
+                
+                w_limit = WindJudge.get_limit(is_ebb, is_south, wave_h <= SafetyRule.MAX_WAVE_HEIGHT_NORMAL)
+                w_wave_limit = SafetyRule.MAX_WAVE_HEIGHT_STRICT if (is_south or is_ebb) else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
+                
+                # 💡 潮位の制限値も定数から取得して統一的に持たせる
+                w_tide_limit = SafetyRule.MIN_TIDE_CM
+
                 graph_data_list.append(
                     {
                         "時間": int(k),
                         "風速": v.wind_speed if v.wind_speed is not None else 0.0,
-                        "波高": extract_number(v.wave_height),
+                        "波高": wave_h,
                         "潮位": extract_number(v.tide),
                         "降水確率": v.precipitation_probability
                         if hasattr(v, "precipitation_probability")
@@ -349,6 +360,9 @@ elif st.session_state.current_page == "home":
                         if hasattr(v, "temperature") and v.temperature is not None
                         else 20.0,
                         "判定": status_str,
+                        "制限風速": w_limit,
+                        "制限波高": w_wave_limit,
+                        "制限潮位": w_tide_limit,  # ← 追加
                     }
                 )
         df_graph = pd.DataFrame(graph_data_list)

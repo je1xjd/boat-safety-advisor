@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from engine import SafetyRule
+from engine import WindJudge
+
 
 # モジュールロード時に1回だけフォントを設定
 plt.rcParams["font.family"] = "Yu Gothic"
@@ -52,18 +54,39 @@ def render_all_desktop_graphs(wind_tab, wave_tab, tide_tab, precip_tab, hour_dat
     ]
     temps = [getattr(v, "temperature", 0) for v in filtered_items.values()]
 
-    # --- 1. 風速グラフ ---
+    # --- 1. 風速グラフ（時間ごとの動的風速制限値の算出） ---
+    wind_limits = []
+    for h, v in filtered_items.items():
+        is_south = WindJudge.is_south_wind(getattr(v, "wind_dir", 0))
+        is_ebb = getattr(v, "is_ebb", False) # オブジェクトが保持する下げ潮フラグ（または潮位データから算出）
+        wave_h = getattr(v, "wave_height", 0)
+
+        # 時間ごとの制限風速を算出 (南風&下げ潮:5.5m/s, 下げ潮のみ:7.0m/s, 南風のみ:7.5m/s, その他:9.0m/s)
+        limit = WindJudge.get_limit(is_ebb, is_south, wave_h <= SafetyRule.MAX_WAVE_HEIGHT_NORMAL)
+        wind_limits.append(limit)
+
     _update_or_create_single_chart(
         wind_tab, "wind", hours, winds,
         ylabel="風速(m/s)", color=SafetyRule.WIND_COLOR, y_lim=SafetyRule.WIND_Y_LIMIT,
-        threshold=SafetyRule.WIND_LIMIT_NORMAL, threshold_label="制限風速"
+        threshold=wind_limits, threshold_label="制限風速"
     )
 
-    # --- 2. 波高グラフ ---
+    # --- 2. 波高グラフ（時間ごとの動的波高制限値の算出） ---
+    wave_limits = []
+    for h, v in filtered_items.items():
+        is_south = WindJudge.is_south_wind(getattr(v, "wind_dir", 0))
+        is_ebb = getattr(v, "is_ebb", False)
+
+        # 南風または下げ潮時は制限が厳しくなり 0.8m、通常時は 1.0m
+        if is_south or is_ebb:
+            wave_limits.append(SafetyRule.MAX_WAVE_HEIGHT_STRICT)
+        else:
+            wave_limits.append(SafetyRule.MAX_WAVE_HEIGHT_NORMAL)
+
     _update_or_create_single_chart(
         wave_tab, "wave", hours, waves,
         ylabel="波高(m)", color=SafetyRule.WAVE_COLOR, y_lim=SafetyRule.WAVE_Y_LIMIT,
-        threshold=SafetyRule.MAX_WAVE_HEIGHT_NORMAL, threshold_label="制限波高"
+        threshold=wave_limits, threshold_label="制限波高"
     )
 
     # --- 3. 潮位グラフ ---
@@ -95,13 +118,25 @@ def _update_or_create_single_chart(parent, key, hours, data, ylabel, color, y_li
     ax.plot(hours, data, color=color, marker="o")
 
     if threshold is not None:
-        ax.axhline(
-            y=threshold,
-            color="red",
-            linestyle="--",
-            linewidth=1.5,
-            label=threshold_label,
-        )
+        if isinstance(threshold, (list, tuple)):
+            # 💡 各時間の閾値を折れ線としてプロット
+            ax.plot(
+                hours,
+                threshold,
+                color="red",
+                linestyle="--",
+                linewidth=1.5,
+                label=threshold_label,
+            )
+        else:
+            # 単一の固定閾値（従来の水平線）
+            ax.axhline(
+                y=threshold,
+                color="red",
+                linestyle="--",
+                linewidth=1.5,
+                label=threshold_label,
+            )
         if threshold_label:
             ax.legend(loc="upper right", fontsize=9)
 

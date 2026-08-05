@@ -22,11 +22,11 @@ def draw_fixed_chart(
     df: pd.DataFrame,
     y_col: str,
     color: str,
-    limit_val: float = None,
+    limit_val: float | list | str = None,  # 💡 数値だけでなくリストや列名も許容
     limit_label: str = None,
     y_max: float = None,
 ) -> alt.Chart:
-    """指定された条件と制限値に基づいて固定スケールの単一項目のAltairチャートを生成する。"""
+    """指定された条件と制限値（固定値または動的配列/列）に基づいてAltairチャートを生成する。"""
     y_scale_args = {"zero": True}
     if y_max is not None:
         y_scale_args["domain"] = [0, y_max]
@@ -67,23 +67,72 @@ def draw_fixed_chart(
 
     if limit_val is not None:
         label_text = limit_label or "制限値"
-        rule_df = pd.DataFrame([{"y_val": limit_val, "legend_label": label_text}])
-        rule = (
-            alt.Chart(rule_df)
-            .mark_rule(color="red", strokeDash=[4, 4], size=2)
-            .encode(
-                y="y_val:Q",
-                strokeDash=alt.value([4, 4]),
-                color=alt.Color(
-                    "legend_label:N",
-                    scale=alt.Scale(domain=[label_text], range=["red"]),
-                    legend=alt.Legend(
-                        title=None, orient="top-right", symbolType="stroke"
+        
+        # 💡 limit_val が DataFrame の列名である場合
+        if isinstance(limit_val, str) and limit_val in df.columns:
+            # 凡例を表示させるため、色やストロークのエンコーディングにダミーの文字列を紐付ける
+            temp_df = df.copy()
+            temp_df["_limit_legend"] = label_text
+            
+            limit_line = (
+                alt.Chart(temp_df)
+                .mark_line(strokeDash=[4, 4], size=2)
+                .encode(
+                    x="時間:Q",
+                    y=alt.Y(f"{limit_val}:Q", title=None),
+                    color=alt.Color(
+                        "_limit_legend:N",
+                        scale=alt.Scale(domain=[label_text], range=["red"]),
+                        legend=alt.Legend(
+                            title=None, orient="top-right", symbolType="stroke"
+                        ),
                     ),
-                ),
+                    tooltip=[alt.Tooltip(f"{limit_val}:Q", title=label_text, format=".1f")]
+                )
             )
-        )
-        chart = alt.layer(line, rule).properties(height=300)
+            chart = alt.layer(line, limit_line).properties(height=300)
+            
+        elif isinstance(limit_val, (list, tuple)):
+            # リストが直接渡された場合
+            temp_df = df.copy()
+            temp_df["_dynamic_limit"] = list(limit_val)
+            temp_df["_limit_legend"] = label_text
+            
+            limit_line = (
+                alt.Chart(temp_df)
+                .mark_line(strokeDash=[4, 4], size=2)
+                .encode(
+                    x="時間:Q",
+                    y=alt.Y("_dynamic_limit:Q", title=None),
+                    color=alt.Color(
+                        "_limit_legend:N",
+                        scale=alt.Scale(domain=[label_text], range=["red"]),
+                        legend=alt.Legend(
+                            title=None, orient="top-right", symbolType="stroke"
+                        ),
+                    ),
+                )
+            )
+            chart = alt.layer(line, limit_line).properties(height=300)
+        else:
+            # 従来どおりの単一の数値（水平線）
+            rule_df = pd.DataFrame([{"y_val": float(limit_val), "legend_label": label_text}])
+            rule = (
+                alt.Chart(rule_df)
+                .mark_rule(color="red", strokeDash=[4, 4], size=2)
+                .encode(
+                    y="y_val:Q",
+                    strokeDash=alt.value([4, 4]),
+                    color=alt.Color(
+                        "legend_label:N",
+                        scale=alt.Scale(domain=[label_text], range=["red"]),
+                        legend=alt.Legend(
+                            title=None, orient="top-right", symbolType="stroke"
+                        ),
+                    ),
+                )
+            )
+            chart = alt.layer(line, rule).properties(height=300)
     else:
         chart = line.properties(height=300)
 
