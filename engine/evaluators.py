@@ -38,6 +38,10 @@ class WindWaveEvaluator:
             else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
         )
 
+        # グラフ側の制限波高ライン（赤線）を超えている場合は、問答無用で危険（False）とする
+        if wave_height > limit_wave:
+            return False
+
         limit = WindJudge.get_limit(is_ebb, is_south, wave_height <= limit_wave)
 
         return WindJudge.is_safe(wind_speed, limit, wave_height)

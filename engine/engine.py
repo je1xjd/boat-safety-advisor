@@ -48,6 +48,10 @@ class BoatSafetyEngine:
             else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
         )
 
+        # 【追加】グラフの赤線（制限波高）を超える波高の場合は、問答無用で危険（False）とする
+        if wave_height > limit_wave:
+            return False
+
         limit = WindJudge.get_limit(is_ebb, is_south, wave_height <= limit_wave)
         return WindJudge.is_safe(wind_speed, limit, wave_height)
 
