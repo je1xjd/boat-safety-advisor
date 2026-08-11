@@ -13,8 +13,8 @@ from engine import SafetyRule
 
 
 def extract_number(val: str | float) -> float:
-    """文字列や数値から最初の数値（小数含む）を抽出する。"""
-    m = re.search(r"(\d+\.?\d*)", str(val))
+    """文字列や数値から最初の数値を抽出する。"""
+    m = re.search(r"(-?\d+\.?\d*)", str(val))
     return float(m.group(1)) if m else 0.0
 
 
@@ -22,14 +22,24 @@ def draw_fixed_chart(
     df: pd.DataFrame,
     y_col: str,
     color: str,
-    limit_val: float | list | str = None,  # 💡 数値だけでなくリストや列名も許容
+    limit_val: float | list | str = None,  # 数値だけでなくリストや列名も許容
     limit_label: str = None,
     y_max: float = None,
+    y_min: float = None,  # 💡 追加: Y軸の下限を動的に指定できるようにする
 ) -> alt.Chart:
     """指定された条件と制限値（固定値または動的配列/列）に基づいてAltairチャートを生成する。"""
-    y_scale_args = {"zero": True}
-    if y_max is not None:
-        y_scale_args["domain"] = [0, y_max]
+    
+    # 💡 修正: y_min が指定されている場合は zero=False にし、マイナス値のドメインを有効にする
+    if y_min is not None:
+        y_scale_args = {
+            "zero": False,
+            "domain": [y_min, y_max if y_max is not None else df[y_col].max()],
+            "nice": False,
+        }
+    else:
+        y_scale_args = {"zero": True}
+        if y_max is not None:
+            y_scale_args["domain"] = [0, y_max]
 
     line = (
         alt.Chart(df)

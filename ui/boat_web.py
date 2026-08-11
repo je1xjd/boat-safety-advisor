@@ -230,6 +230,11 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
 
     with tab_tide:
         st.subheader("潮位 (cm)")
+        
+        tide_min = df_graph["潮位"].min() if "潮位" in df_graph.columns and not df_graph["潮位"].empty else 0
+        
+        y_min_val = min(-10, tide_min - 5) if tide_min < 0 else 0
+        
         st.altair_chart(
             draw_fixed_chart(
                 df_graph,
@@ -238,6 +243,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 limit_val="制限潮位",
                 limit_label="最低潮位",
                 y_max=SafetyRule.TIDE_Y_LIMIT,
+                y_min=y_min_val,
             ),
             width="stretch",
         )

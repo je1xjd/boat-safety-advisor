@@ -90,10 +90,14 @@ def render_all_desktop_graphs(wind_tab, wave_tab, tide_tab, precip_tab, hour_dat
     )
 
     # --- 3. 潮位グラフ ---
+    tide_min = min(tides) if tides else 0
+    tide_ylim_bottom = min(-10, tide_min - 5) if tide_min < 0 else 0
+
     _update_or_create_single_chart(
         tide_tab, "tide", hours, tides,
         ylabel="潮位(cm)", color=SafetyRule.TIDE_COLOR, y_lim=SafetyRule.TIDE_Y_LIMIT,
-        threshold=SafetyRule.MIN_TIDE_CM, threshold_label="最低潮位"
+        threshold=SafetyRule.MIN_TIDE_CM, threshold_label="最低潮位",
+        y_min=tide_ylim_bottom
     )
 
     # --- 4. 降水・気温グラフ（2軸） ---
@@ -102,7 +106,7 @@ def render_all_desktop_graphs(wind_tab, wave_tab, tide_tab, precip_tab, hour_dat
     )
 
 
-def _update_or_create_single_chart(parent, key, hours, data, ylabel, color, y_lim, threshold=None, threshold_label=None):
+def _update_or_create_single_chart(parent, key, hours, data, ylabel, color, y_lim, threshold=None, threshold_label=None, y_min=0):
     """単一軸グラフの初回作成または既存キャッシュのクリア＆再描画を行う"""
     if key not in _chart_cache or _chart_cache[key]["parent"] != parent:
         fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
@@ -119,7 +123,7 @@ def _update_or_create_single_chart(parent, key, hours, data, ylabel, color, y_li
 
     if threshold is not None:
         if isinstance(threshold, (list, tuple)):
-            # 💡 各時間の閾値を折れ線としてプロット
+            # 各時間の閾値を折れ線としてプロット
             ax.plot(
                 hours,
                 threshold,
@@ -147,7 +151,8 @@ def _update_or_create_single_chart(parent, key, hours, data, ylabel, color, y_li
     ax.set_xticks(
         range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR + 1)
     )
-    ax.set_ylim(0, y_lim)
+    
+    ax.set_ylim(y_min, y_lim)
 
     ax.grid(True, linestyle="--", color="#DDDDDD", linewidth=0.5, axis="both")
     ax.set_axisbelow(True)
