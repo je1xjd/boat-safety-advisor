@@ -14,7 +14,7 @@ from engine import SafetyRule
 
 def extract_number(val: str | float) -> float:
     """文字列や数値から最初の数値を抽出する。"""
-    m = re.search(r"(-?\d+\.?\d*)", str(val))
+    m = re.search(r"(-?\d+(?:\.\d+)?)", str(val))
     return float(m.group(1)) if m else 0.0
 
 

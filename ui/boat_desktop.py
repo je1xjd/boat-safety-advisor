@@ -46,9 +46,6 @@ class BoatSafetyApp:
         self._create_layout()
         self.menu_win = None
 
-        # ガベージコレクション時のスレッド競合（RuntimeError）を防ぐため画像参照を保持するリスト
-        self.active_images = []
-
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -272,10 +269,10 @@ class BoatSafetyApp:
 
         target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d").date()
         
-        self.executor.submit(self._async_fetch_and_judge, target_date_str, target_date)
+        self.executor.submit(self._async_fetch_and_judge, target_date)
 
     def _async_fetch_and_judge(
-        self, target_date_str: str, target_date: datetime.date
+        self, target_date: datetime.date
     ) -> None:
         try:
             result = BoatDataService.get_full_analysis(target_date)
@@ -334,16 +331,9 @@ class BoatSafetyApp:
                     tags=(row.tag,),
                 )
 
-            # 古い画像参照をクリアしてから新しいグラフ描画結果の画像を保持する
-            self.active_images.clear()
-            rendered = render_all_desktop_graphs(
+            render_all_desktop_graphs(
                 self.wind_tab, self.wave_tab, self.tide_tab, self.precip_tab, hour_data
             )
-            if rendered:
-                if isinstance(rendered, (list, tuple)):
-                    self.active_images.extend(rendered)
-                else:
-                    self.active_images.append(rendered)
 
             ui_data = SafetyReportFormatter.get_ui_summary_data(summary)
             self.result_label.config(text=f" {ui_data['label']}", fg=ui_data["color"])
