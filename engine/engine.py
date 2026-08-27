@@ -48,7 +48,6 @@ class BoatSafetyEngine:
             else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
         )
 
-        # 【追加】グラフの赤線（制限波高）を超える波高の場合は、問答無用で危険（False）とする
         if wave_height > limit_wave:
             return False
 
@@ -131,7 +130,6 @@ class BoatSafetyEngine:
         sunset_time: datetime.time | None,
     ) -> tuple[str, str]:
         """UI表示用の海況ステータスとカラーカテゴリを返す（分単位の日出入対応）。"""
-        # 7時〜18時の間は、日出入の細かい時刻に関わらず日中（時間内）として優先的に扱う
         if 7 <= hour <= 18:
             if data.is_safe:
                 return "安全", "safe"
@@ -139,7 +137,6 @@ class BoatSafetyEngine:
                 return "潮位", "tide_low"
             return "危険", "danger"
 
-        # 7時未満、19時以降の時間帯のみ日没・夜明とする
         return ("日没" if hour > 18 else "夜明"), "danger"
 
     @classmethod
@@ -198,12 +195,35 @@ class BoatSafetyEngine:
         hour_data: dict,
         sunrise_time: datetime.time | None,
         sunset_time: datetime.time | None,
+        high_tides: list[int] | None = None,
+        low_tides: list[int] | None = None,
     ):
         """時間帯ごとの物理的安全性と潮位低下によるリスクをシーケンスで判定する（分単位の日出入対応）。"""
+        from engine.wind import WindJudge
+
         hours = sorted(hour_data.keys())
 
         for hour in hours:
             data = hour_data[hour]
+            
+            # 💡 エンジン側で各時間の limit_wave と limit_wind を確実に算出してオブジェクトに保持させる
+            if high_tides is not None and low_tides is not None:
+                is_south = WindJudge.is_south_wind(getattr(data, "wind_dir", 0))
+                is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
+                
+                limit_wave = (
+                    SafetyRule.MAX_WAVE_HEIGHT_STRICT
+                    if (is_south or is_ebb)
+                    else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
+                )
+                limit_wind = WindJudge.get_limit(
+                    is_ebb, is_south, getattr(data, "wave_height", 0) <= limit_wave
+                )
+                
+                # オブジェクトへ保持
+                data.limit_wave = limit_wave
+                data.limit_wind = limit_wind
+
             if sunrise_time is not None and sunset_time is not None:
                 target_time = datetime.time(hour, 0)
                 is_time_ok = sunrise_time <= target_time < sunset_time
@@ -221,7 +241,6 @@ class BoatSafetyEngine:
                     i += 1
                 end = i - 1
 
-                # 潮位低下期間の前後が安全な場合のみ、黄色（注意）として扱う
                 prev_h = hours[start - 1] if start > 0 else None
                 next_h = hours[end + 1] if end < len(hours) - 1 else None
 
