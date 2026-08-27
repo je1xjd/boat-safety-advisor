@@ -3,13 +3,13 @@ desktop_charts.py
 
 Tkinterアプリケーション（Matplotlib）で使用する海況グラフの描画ヘルパー。
 初回起動時にFigureとCanvasを初期化し、更新時は再利用（ax.clear）する設計。
+エンジン側で算出・保持された制限値（limit_wind, limit_wave）をそのまま活用する。
 """
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from engine import SafetyRule
-from engine import WindJudge
 
 
 # モジュールロード時に1回だけフォントを設定
@@ -54,39 +54,40 @@ def render_all_desktop_graphs(wind_tab, wave_tab, tide_tab, precip_tab, hour_dat
     ]
     temps = [getattr(v, "temperature", 0) for v in filtered_items.values()]
 
-    # --- 1. 風速グラフ（時間ごとの動的風速制限値の算出） ---
-    wind_limits = []
-    for h, v in filtered_items.items():
-        is_south = WindJudge.is_south_wind(getattr(v, "wind_dir", 0))
-        is_ebb = getattr(v, "is_ebb", False) # オブジェクトが保持する下げ潮フラグ（または潮位データから算出）
-        wave_h = getattr(v, "wave_height", 0)
-
-        # 時間ごとの制限風速を算出 (南風&下げ潮:5.5m/s, 下げ潮のみ:7.0m/s, 南風のみ:7.5m/s, その他:9.0m/s)
-        limit = WindJudge.get_limit(is_ebb, is_south, wave_h <= SafetyRule.MAX_WAVE_HEIGHT_NORMAL)
-        wind_limits.append(limit)
+    # --- 1. 風速グラフ（エンジン側が保持する limit_wind を取得） ---
+    wind_limits = [
+        getattr(v, "limit_wind", SafetyRule.WIND_LIMIT_NORMAL)
+        for v in filtered_items.values()
+    ]
 
     _update_or_create_single_chart(
-        wind_tab, "wind", hours, winds,
-        ylabel="風速(m/s)", color=SafetyRule.WIND_COLOR, y_lim=SafetyRule.WIND_Y_LIMIT,
-        threshold=wind_limits, threshold_label="制限風速"
+        wind_tab,
+        "wind",
+        hours,
+        winds,
+        ylabel="風速(m/s)",
+        color=SafetyRule.WIND_COLOR,
+        y_lim=SafetyRule.WIND_Y_LIMIT,
+        threshold=wind_limits,
+        threshold_label="制限風速",
     )
 
-    # --- 2. 波高グラフ（時間ごとの動的波高制限値の算出） ---
-    wave_limits = []
-    for h, v in filtered_items.items():
-        is_south = WindJudge.is_south_wind(getattr(v, "wind_dir", 0))
-        is_ebb = getattr(v, "is_ebb", False)
-
-        # 南風または下げ潮時は制限が厳しくなり 0.8m、通常時は 1.0m
-        if is_south or is_ebb:
-            wave_limits.append(SafetyRule.MAX_WAVE_HEIGHT_STRICT)
-        else:
-            wave_limits.append(SafetyRule.MAX_WAVE_HEIGHT_NORMAL)
+    # --- 2. 波高グラフ（エンジン側が保持する limit_wave を取得） ---
+    wave_limits = [
+        getattr(v, "limit_wave", SafetyRule.MAX_WAVE_HEIGHT_NORMAL)
+        for v in filtered_items.values()
+    ]
 
     _update_or_create_single_chart(
-        wave_tab, "wave", hours, waves,
-        ylabel="波高(m)", color=SafetyRule.WAVE_COLOR, y_lim=SafetyRule.WAVE_Y_LIMIT,
-        threshold=wave_limits, threshold_label="制限波高"
+        wave_tab,
+        "wave",
+        hours,
+        waves,
+        ylabel="波高(m)",
+        color=SafetyRule.WAVE_COLOR,
+        y_lim=SafetyRule.WAVE_Y_LIMIT,
+        threshold=wave_limits,
+        threshold_label="制限波高",
     )
 
     # --- 3. 潮位グラフ ---
@@ -94,10 +95,16 @@ def render_all_desktop_graphs(wind_tab, wave_tab, tide_tab, precip_tab, hour_dat
     tide_ylim_bottom = min(-10, tide_min - 5) if tide_min < 0 else 0
 
     _update_or_create_single_chart(
-        tide_tab, "tide", hours, tides,
-        ylabel="潮位(cm)", color=SafetyRule.TIDE_COLOR, y_lim=SafetyRule.TIDE_Y_LIMIT,
-        threshold=SafetyRule.MIN_TIDE_CM, threshold_label="最低潮位",
-        y_min=tide_ylim_bottom
+        tide_tab,
+        "tide",
+        hours,
+        tides,
+        ylabel="潮位(cm)",
+        color=SafetyRule.TIDE_COLOR,
+        y_lim=SafetyRule.TIDE_Y_LIMIT,
+        threshold=SafetyRule.MIN_TIDE_CM,
+        threshold_label="最低潮位",
+        y_min=tide_ylim_bottom,
     )
 
     # --- 4. 降水・気温グラフ（2軸） ---
@@ -106,7 +113,18 @@ def render_all_desktop_graphs(wind_tab, wave_tab, tide_tab, precip_tab, hour_dat
     )
 
 
-def _update_or_create_single_chart(parent, key, hours, data, ylabel, color, y_lim, threshold=None, threshold_label=None, y_min=0):
+def _update_or_create_single_chart(
+    parent,
+    key,
+    hours,
+    data,
+    ylabel,
+    color,
+    y_lim,
+    threshold=None,
+    threshold_label=None,
+    y_min=0,
+):
     """単一軸グラフの初回作成または既存キャッシュのクリア＆再描画を行う"""
     if key not in _chart_cache or _chart_cache[key]["parent"] != parent:
         fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
@@ -151,7 +169,7 @@ def _update_or_create_single_chart(parent, key, hours, data, ylabel, color, y_li
     ax.set_xticks(
         range(SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR + 1)
     )
-    
+
     ax.set_ylim(y_min, y_lim)
 
     ax.grid(True, linestyle="--", color="#DDDDDD", linewidth=0.5, axis="both")
@@ -168,7 +186,13 @@ def _update_or_create_dual_chart(parent, key, hours, precips, temps):
         ax2 = ax1.twinx()
         canvas = FigureCanvasTkAgg(fig, master=parent)
         canvas.get_tk_widget().pack(fill="both", expand=True)
-        _chart_cache[key] = {"fig": fig, "ax1": ax1, "ax2": ax2, "canvas": canvas, "parent": parent}
+        _chart_cache[key] = {
+            "fig": fig,
+            "ax1": ax1,
+            "ax2": ax2,
+            "canvas": canvas,
+            "parent": parent,
+        }
     else:
         fig = _chart_cache[key]["fig"]
         ax1 = _chart_cache[key]["ax1"]
@@ -176,7 +200,7 @@ def _update_or_create_dual_chart(parent, key, hours, precips, temps):
         canvas = _chart_cache[key]["canvas"]
 
     ax1.clear()
-    ax2.clear()  # 💡既存のax2をクリアして再利用する（毎回twinxを作らない）
+    ax2.clear()  # 既存のax2をクリアして再利用する
 
     # 左軸：降水確率（棒グラフ）
     color_precip = "#4682b4"
@@ -197,11 +221,11 @@ def _update_or_create_dual_chart(parent, key, hours, precips, temps):
     # 右軸：気温（折れ線グラフ）
     color_temp = "#ff4500"  # オレンジレッド
     ax2.set_ylabel("気温 (℃)", color=color_temp)
-    
+
     ax2.yaxis.set_label_position("right")
     ax2.yaxis.tick_right()
 
-    line = ax2.plot(
+    ax2.plot(
         hours, temps, color=color_temp, marker="s", linewidth=2, label="気温"
     )
     ax2.tick_params(axis="y", labelcolor=color_temp)

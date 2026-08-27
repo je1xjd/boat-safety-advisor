@@ -14,6 +14,7 @@ from tkinter import messagebox, ttk
 
 from engine import (
     AnalysisResult,
+    BoatSafetyEngine,
     ReportFormatter,
     SafetyReportFormatter,
     SunCalculator,
@@ -308,6 +309,19 @@ class BoatSafetyApp:
 
             self.result_tree.delete(*self.result_tree.get_children())
             sunrise_time, sunset_time = SunCalculator.get_sun_times(umi_info)
+
+            # 💡 ルール適用処理
+            high_tides = getattr(umi_info, "high_tides", getattr(umi_info, "high_tide_list", []))
+            low_tides = getattr(umi_info, "low_tides", getattr(umi_info, "low_tide_list", []))
+
+            BoatSafetyEngine.apply_sequence_rules(
+                hour_data, 
+                sunrise_time, 
+                sunset_time, 
+                high_tides, 
+                low_tides
+            )
+
             table_rows = SafetyReportFormatter.build_table_rows(
                 hour_data, sunrise_time, sunset_time
             )

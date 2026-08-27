@@ -159,7 +159,6 @@ CHECKLIST_CONFIG = {
 def _render_checklist_page(section_key: str, title: str) -> None:
     """
     チェックリストおよび判定基準画面を描画する。
-    長大化していたページごとの表示制御ロジックを整理・分離するために切り出し。
     """
     st.title(title)
 
@@ -184,7 +183,6 @@ def _render_checklist_page(section_key: str, title: str) -> None:
 def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
     """
     判定結果のデータフレームと各種グラフを表示するタブUIエリアを構築する。
-    ホーム画面内の描画処理をすっきり整理するために切り出し。
     """
     tab1, tab_wind, tab_wave, tab_tide, tab_precip_temp = st.tabs(
         ["📊 判定結果", "🍃 風速", "🌊 波高", "🚢 潮位", "🌧 降水・気温"]
@@ -207,7 +205,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 df_graph,
                 "風速",
                 SafetyRule.WIND_COLOR,
-                limit_val="制限風速",  # 💡 df_graph の列名を文字列で指定
+                limit_val="制限風速",
                 limit_label="制限風速",
                 y_max=SafetyRule.WIND_Y_LIMIT,
             ),
@@ -221,7 +219,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 df_graph,
                 "波高",
                 SafetyRule.WAVE_COLOR,
-                limit_val="制限波高",  # 💡 df_graph の列名を文字列で指定
+                limit_val="制限波高",
                 limit_label="制限波高",
                 y_max=SafetyRule.WAVE_Y_LIMIT,
             ),
@@ -232,7 +230,6 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
         st.subheader("潮位 (cm)")
         
         tide_min = df_graph["潮位"].min() if "潮位" in df_graph.columns and not df_graph["潮位"].empty else 0
-        
         y_min_val = min(-10, tide_min - 5) if tide_min < 0 else 0
         
         st.altair_chart(
@@ -321,7 +318,6 @@ elif st.session_state.current_page == "home":
             }
         )
 
-        # グラフ用のデータフレームを作成（制限値の列も含める）
         graph_data_list = []
         for k, v in result.hour_data.items():
             if SafetyRule.ACTIVITY_START_HOUR <= int(k) <= SafetyRule.ACTIVITY_END_HOUR:
@@ -340,16 +336,13 @@ elif st.session_state.current_page == "home":
                         )
                         break
 
-                # 動的な制限値の算出
                 wind_dir = getattr(v, "wind_dir", 0) or 0
-                is_south = WindJudge.is_south_wind(wind_dir) if "WindJudge" in globals() or hasattr(WindJudge, "is_south_wind") else False
+                is_south = WindJudge.is_south_wind(wind_dir) if hasattr(WindJudge, "is_south_wind") else False
                 is_ebb = getattr(v, "is_ebb", False)
                 wave_h = extract_number(v.wave_height)
                 
                 w_limit = WindJudge.get_limit(is_ebb, is_south, wave_h <= SafetyRule.MAX_WAVE_HEIGHT_NORMAL)
                 w_wave_limit = SafetyRule.MAX_WAVE_HEIGHT_STRICT if (is_south or is_ebb) else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
-                
-                # 💡 潮位の制限値も定数から取得して統一的に持たせる
                 w_tide_limit = SafetyRule.MIN_TIDE_CM
 
                 graph_data_list.append(
@@ -368,10 +361,10 @@ elif st.session_state.current_page == "home":
                         "判定": status_str,
                         "制限風速": w_limit,
                         "制限波高": w_wave_limit,
-                        "制限潮位": w_tide_limit,  # ← 追加
+                        "制限潮位": w_tide_limit,
                     }
                 )
+
         df_graph = pd.DataFrame(graph_data_list)
 
-        # グラフおよびタブ表示領域の構築処理を整理
         _create_graph_tabs(df, df_graph)
