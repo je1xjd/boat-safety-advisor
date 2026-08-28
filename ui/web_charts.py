@@ -25,21 +25,46 @@ def draw_fixed_chart(
     limit_val: float | list | str = None,  # 数値だけでなくリストや列名も許容
     limit_label: str = None,
     y_max: float = None,
-    y_min: float = None,  # 💡 追加: Y軸の下限を動的に指定できるようにする
+    y_min: float = 0,  # デフォルトを0に設定（風・波は0固定）
 ) -> alt.Chart:
     """指定された条件と制限値（固定値または動的配列/列）に基づいてAltairチャートを生成する。"""
     
-    # 💡 修正: y_min が指定されている場合は zero=False にし、マイナス値のドメインを有効にする
-    if y_min is not None:
+    # --- 💡 動的なY軸ドメイン（上限・下限）の算出 ---
+    data_max = df[y_col].max() if not df[y_col].empty else 0
+    
+    # 制限値の最大値を取得
+    lim_max = 0
+    if isinstance(limit_val, str) and limit_val in df.columns:
+        lim_max = df[limit_val].max()
+    elif isinstance(limit_val, (list, tuple)):
+        lim_max = max(limit_val) if limit_val else 0
+    elif limit_val is not None:
+        lim_max = float(limit_val)
+
+    # 1. 制限値がある場合は「制限値の2倍」をベース上限とする（常に真ん中付近に制限値が来るようにする）
+    # 2. 予測データ(data_max)がそれを超えて大きくなっている場合は、データに合わせてさらに拡張する
+    if lim_max > 0:
+        calculated_max = max(lim_max * 2.0, data_max * 1.1)
+    else:
+        # 制限値がない一般的な項目の場合
+        calculated_max = max(data_max * 1.1, 10.0)
+
+    final_max = y_max if y_max is not None else calculated_max
+
+    # 💡 y_min がマイナス（潮位など）の場合は zero=False にし、マイナス側の指定を有効にする
+    if y_min < 0:
         y_scale_args = {
             "zero": False,
-            "domain": [y_min, y_max if y_max is not None else df[y_col].max()],
+            "domain": [y_min, final_max],
             "nice": False,
         }
     else:
-        y_scale_args = {"zero": True}
-        if y_max is not None:
-            y_scale_args["domain"] = [0, y_max]
+        # 風や波などのように下限が0の場合（"nice": False で勝手に上限が広がるのを防ぐ）[cite: 8]
+        y_scale_args = {
+            "zero": True,
+            "domain": [0, final_max],
+            "nice": False,
+        }
 
     line = (
         alt.Chart(df)
@@ -78,9 +103,8 @@ def draw_fixed_chart(
     if limit_val is not None:
         label_text = limit_label or "制限値"
         
-        # 💡 limit_val が DataFrame の列名である場合
+        # 💡 limit_val が DataFrame の列名である場合[cite: 8]
         if isinstance(limit_val, str) and limit_val in df.columns:
-            # 凡例を表示させるため、色やストロークのエンコーディングにダミーの文字列を紐付ける
             temp_df = df.copy()
             temp_df["_limit_legend"] = label_text
             
@@ -103,7 +127,7 @@ def draw_fixed_chart(
             chart = alt.layer(line, limit_line).properties(height=300)
             
         elif isinstance(limit_val, (list, tuple)):
-            # リストが直接渡された場合
+            # リストが直接渡された場合[cite: 8]
             temp_df = df.copy()
             temp_df["_dynamic_limit"] = list(limit_val)
             temp_df["_limit_legend"] = label_text
@@ -125,7 +149,7 @@ def draw_fixed_chart(
             )
             chart = alt.layer(line, limit_line).properties(height=300)
         else:
-            # 従来どおりの単一の数値（水平線）
+            # 従来どおりの単一の数値（水平線）[cite: 8]
             rule_df = pd.DataFrame([{"y_val": float(limit_val), "legend_label": label_text}])
             rule = (
                 alt.Chart(rule_df)
@@ -173,7 +197,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         ),
     )
 
-    # 左軸：降水確率（棒グラフ）
+    # 左軸：降水確率（棒グラフ）[cite: 8]
     bars = (
         alt.Chart(df)
         .mark_bar(color="#4682b4", opacity=0.55, width=18)
@@ -192,7 +216,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         )
     )
 
-    # 右軸：気温（折れ線グラフ）
+    # 右軸：気温（折れ線グラフ）[cite: 8]
     temp_min = df["気温"].min() if not df.empty else 0
     temp_max = df["気温"].max() if not df.empty else 30
 
@@ -225,7 +249,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         )
     )
 
-    # レイヤー結合（背景なし、独立したY軸スケールを適用）
+    # レイヤー結合（背景なし、独立したY軸スケールを適用）[cite: 8]
     chart = (
         alt.layer(bars, lines)
         .resolve_scale(y="independent")

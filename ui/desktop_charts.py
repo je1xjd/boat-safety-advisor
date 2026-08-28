@@ -90,11 +90,14 @@ def render_all_desktop_graphs(
     ]
 
     # --- 1. 風速グラフ ---
-    # engine.pyで算出された各時間の制限風速をそのまま使用
     wind_limits = [
         v.limit_wind
         for v in filtered_items.values()
     ]
+    # 制限値の最大値を基に上限を動的計算（下限は0固定）
+    wind_limit_max = max(wind_limits) if wind_limits else SafetyRule.WIND_LIMIT_NORMAL
+    wind_data_max = max(winds) if winds else 0
+    wind_dynamic_top = max(wind_limit_max * 2.0, wind_data_max * 1.1)
 
     _update_or_create_single_chart(
         wind_tab,
@@ -103,17 +106,21 @@ def render_all_desktop_graphs(
         winds,
         ylabel="風速(m/s)",
         color=SafetyRule.WIND_COLOR,
-        y_lim=SafetyRule.WIND_Y_LIMIT,
+        y_lim=wind_dynamic_top,
         threshold=wind_limits,
         threshold_label="制限風速",
+        y_min=0,
     )
 
     # --- 2. 波高グラフ ---
-    # engine.pyで算出された各時間の制限波高をそのまま使用
     wave_limits = [
         v.limit_wave
         for v in filtered_items.values()
     ]
+    # 制限値の最大値を基に上限を動的計算（下限は0固定）
+    wave_limit_max = max(wave_limits) if wave_limits else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
+    wave_data_max = max(waves) if waves else 0
+    wave_dynamic_top = max(wave_limit_max * 2.0, wave_data_max * 1.1)
 
     _update_or_create_single_chart(
         wave_tab,
@@ -122,20 +129,23 @@ def render_all_desktop_graphs(
         waves,
         ylabel="波高(m)",
         color=SafetyRule.WAVE_COLOR,
-        y_lim=SafetyRule.WAVE_Y_LIMIT,
+        y_lim=wave_dynamic_top,
         threshold=wave_limits,
         threshold_label="制限波高",
+        y_min=0,
     )
 
     # --- 3. 潮位グラフ ---
-    # マイナス潮位にも対応できるよう下限を動的に設定
+    # マイナス潮位にも対応できるよう下限を動的に設定（既存の仕様を維持）
     tide_min = min(tides) if tides else 0
+    tide_max = max(tides) if tides else 0
 
     tide_ylim_bottom = (
         min(-10, tide_min - 5)
         if tide_min < 0
         else 0
     )
+    tide_ylim_top = max(SafetyRule.TIDE_Y_LIMIT, tide_max * 1.1)
 
     _update_or_create_single_chart(
         tide_tab,
@@ -144,7 +154,7 @@ def render_all_desktop_graphs(
         tides,
         ylabel="潮位(cm)",
         color=SafetyRule.TIDE_COLOR,
-        y_lim=SafetyRule.TIDE_Y_LIMIT,
+        y_lim=tide_ylim_top,
         threshold=SafetyRule.MIN_TIDE_CM,
         threshold_label="最低潮位",
         y_min=tide_ylim_bottom,

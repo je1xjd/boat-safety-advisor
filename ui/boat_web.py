@@ -243,7 +243,6 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 SafetyRule.WIND_COLOR,
                 limit_val="制限風速",
                 limit_label="制限風速",
-                y_max=SafetyRule.WIND_Y_LIMIT,
             ),
             width="stretch",
         )
@@ -258,7 +257,6 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 SafetyRule.WAVE_COLOR,
                 limit_val="制限波高",
                 limit_label="制限波高",
-                y_max=SafetyRule.WAVE_Y_LIMIT,
             ),
             width="stretch",
         )
