@@ -18,9 +18,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from dataclasses import asdict
 
 from engine import (
+    BoatSafetyEngine,
     SafetyRule,
     StatusFormatter,
-    WindJudge,
 )
 from engine.formatter import (
     ReportFormatter,
@@ -32,6 +32,7 @@ from engine.utils import SunCalculator, summarize_daytime_weather
 from services.analysis import BoatDataService
 from ui.web_charts import draw_fixed_chart, draw_precip_temp_chart, extract_number
 
+
 # アプリケーションの基本レイアウトとタイトルを設定する
 st.set_page_config(
     page_title="相模川河口 海況安全判定",
@@ -39,6 +40,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
 
 # セッション状態の初期化が行われていない場合、ホーム画面をデフォルトに設定する
 if "current_page" not in st.session_state:
@@ -51,6 +53,7 @@ def _create_menu():
     """
     with st.sidebar:
         st.header("≡ メニュー")
+
         if st.button("🚤 出港判定", width="stretch"):
             st.session_state.current_page = "home"
             st.rerun()
@@ -60,29 +63,37 @@ def _create_menu():
             st.rerun()
 
         st.divider()
+
         st.subheader("🚀 出港前")
+
         if st.button("下架前チェック", width="stretch"):
             st.session_state.current_page = "pre_lower"
             st.rerun()
+
         if st.button("下架後チェック", width="stretch"):
             st.session_state.current_page = "post_lower"
             st.rerun()
 
         st.divider()
+
         st.subheader("⚓ 帰港後")
+
         if st.button("上架前チェック", width="stretch"):
             st.session_state.current_page = "pre_lift"
             st.rerun()
+
         if st.button("上架後チェック", width="stretch"):
             st.session_state.current_page = "post_lift"
             st.rerun()
 
         st.divider()
+
         if st.button("⚙ 設定", width="stretch"):
             st.session_state.current_page = "settings"
             st.rerun()
 
         st.divider()
+
         st.caption("相模川河口 海況安全判定アプリ")
 
 
@@ -118,21 +129,34 @@ def render_summary_card(
         f'<div style="text-align:center; font-size:56px; font-weight:bold; color:{result_color}; padding:10px;">{result_text}</div>',
         unsafe_allow_html=True,
     )
+
     st.markdown(
-        f'<div style="text-align:center; font-size:22px; color:#0b4f84; font-weight:bold;">{weather_text} | 【<span style="color: #e74c3c;">{temp_max:.0f}℃</span> / <span style="color: #3498db;">{temp_min:.0f}℃</span>】</div>',
+        f'<div style="text-align:center; font-size:22px; color:#0b4f84; font-weight:bold;">'
+        f'{weather_text} | 【<span style="color: #e74c3c;">{temp_max:.0f}℃</span> / '
+        f'<span style="color: #3498db;">{temp_min:.0f}℃</span>】</div>',
         unsafe_allow_html=True,
     )
+
     if int(max_window[2]) > 0:
         st.markdown(
-            f'<div style="text-align:center; font-size:18px; color:#2e8b57; font-weight:bold; margin-bottom:10px;">最大連続活動枠: {int(max_window[0]):02d}-{int(max_window[1]):02d}時 ({int(max_window[2])}h)<br>前半 {before_str} / 後半 {after_str}</div>',
+            f'<div style="text-align:center; font-size:18px; color:#2e8b57; '
+            f'font-weight:bold; margin-bottom:10px;">'
+            f'最大連続活動枠: {int(max_window[0]):02d}-{int(max_window[1]):02d}時 '
+            f'({int(max_window[2])}h)<br>'
+            f'前半 {before_str} / 後半 {after_str}</div>',
             unsafe_allow_html=True,
         )
     else:
         st.error(
-            f"連続して安全な時間帯が {SafetyRule.REQUIRED_SAFE_HOURS} 時間以上確保できません。"
+            f"連続して安全な時間帯が "
+            f"{SafetyRule.REQUIRED_SAFE_HOURS} 時間以上確保できません。"
         )
+
     st.markdown(
-        f'<div style="background:#e9ecef; border:1px solid #808080; padding:10px; text-align:center; font-size:15px; font-weight:bold; color:#333; margin-top:8px; border-radius:2px;">{tide_text}</div>',
+        f'<div style="background:#e9ecef; border:1px solid #808080; '
+        f'padding:10px; text-align:center; font-size:15px; font-weight:bold; '
+        f'color:#333; margin-top:8px; border-radius:2px;">'
+        f'{tide_text}</div>',
         unsafe_allow_html=True,
     )
 
@@ -141,9 +165,9 @@ def highlight_status(row):
     """
     データフレームの行ごとの判定ステータスに応じて背景色のスタイルを返す。
     """
-    return [f"background-color: {StatusFormatter.get_status_color(row['判定'])}"] * len(
-        row
-    )
+    return [
+        f"background-color: {StatusFormatter.get_status_color(row['判定'])}"
+    ] * len(row)
 
 
 # --- ページ定義（データ構造） ---
@@ -169,9 +193,11 @@ def _render_checklist_page(section_key: str, title: str) -> None:
             st.text("\n".join(items))
         else:
             st.error("データが空です。")
+
     elif items and "エラー" not in items[0]:
         for item in items:
             st.checkbox(item)
+
     else:
         st.error(items[0] if items else "データが空です。")
 
@@ -191,7 +217,16 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
     with tab1:
         st.dataframe(
             df[
-                ["時間", "判定", "風向", "風速", "波高", "潮位", "降水", "気温"]
+                [
+                    "時間",
+                    "判定",
+                    "風向",
+                    "風速",
+                    "波高",
+                    "潮位",
+                    "降水",
+                    "気温",
+                ]
             ].style.apply(highlight_status, axis=1),
             width="stretch",
             hide_index=True,
@@ -200,6 +235,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
 
     with tab_wind:
         st.subheader("風速 (m/s)")
+
         st.altair_chart(
             draw_fixed_chart(
                 df_graph,
@@ -214,6 +250,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
 
     with tab_wave:
         st.subheader("波高 (m)")
+
         st.altair_chart(
             draw_fixed_chart(
                 df_graph,
@@ -228,10 +265,15 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
 
     with tab_tide:
         st.subheader("潮位 (cm)")
-        
-        tide_min = df_graph["潮位"].min() if "潮位" in df_graph.columns and not df_graph["潮位"].empty else 0
+
+        tide_min = (
+            df_graph["潮位"].min()
+            if "潮位" in df_graph.columns and not df_graph["潮位"].empty
+            else 0
+        )
+
         y_min_val = min(-10, tide_min - 5) if tide_min < 0 else 0
-        
+
         st.altair_chart(
             draw_fixed_chart(
                 df_graph,
@@ -247,37 +289,57 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
 
     with tab_precip_temp:
         st.subheader("降水確率 ＆ 気温")
-        st.altair_chart(draw_precip_temp_chart(df_graph), width="stretch")
+
+        st.altair_chart(
+            draw_precip_temp_chart(df_graph),
+            width="stretch",
+        )
 
 
 # --- ページごとの表示制御 ---
 if st.session_state.current_page in CHECKLIST_CONFIG:
     section_key, title = CHECKLIST_CONFIG[st.session_state.current_page]
+
     _render_checklist_page(section_key, title)
 
 elif st.session_state.current_page == "home":
     st.title("🚤 ボート出港判定")
-    st.caption("相模川河口の潮位・潮汐・風速・風向・波高・うねりを総合評価")
+    st.caption(
+        "相模川河口の潮位・潮汐・風速・風向・波高・うねりを総合評価"
+    )
 
     JST = datetime.timezone(datetime.timedelta(hours=9), "JST")
     today_jst = datetime.datetime.now(JST).date()
-    date_options = [today_jst + datetime.timedelta(days=i) for i in range(8)]
+
+    date_options = [
+        today_jst + datetime.timedelta(days=i)
+        for i in range(8)
+    ]
+
     weekdays = ["月", "火", "水", "木", "金", "土", "日"]
 
     target_date = st.selectbox(
         "判定日",
         date_options,
-        format_func=lambda d: f"{d.strftime('%Y-%m-%d')}({weekdays[d.weekday()]})",
+        format_func=lambda d: (
+            f"{d.strftime('%Y-%m-%d')}({weekdays[d.weekday()]})"
+        ),
     )
 
     if st.button("🔍 海況判定を実行", width="stretch"):
         with st.spinner("データ取得中..."):
             st.session_state.analysis_result = load_all_data(target_date)
 
-    if "analysis_result" in st.session_state and st.session_state.analysis_result:
+    if (
+        "analysis_result" in st.session_state
+        and st.session_state.analysis_result
+    ):
         result = st.session_state.analysis_result
 
-        ui_data = SafetyReportFormatter.get_ui_summary_data(result.summary)
+        ui_data = SafetyReportFormatter.get_ui_summary_data(
+            result.summary
+        )
+
         render_summary_card(
             ui_data["label"],
             ui_data["color"],
@@ -296,15 +358,58 @@ elif st.session_state.current_page == "home":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        sunrise_time, sunset_time = SunCalculator.get_sun_times(result.umi_info)
+        # ---------------------------------------------------------
+        # engine.py と同じルール適用処理を実行する
+        #
+        # ここで各時間の
+        #   - limit_wind
+        #   - limit_wave
+        # が engine.py 側で算出され、hour_data に保持される。
+        # Web版では制限値を独自に再計算しない。
+        # ---------------------------------------------------------
+        sunrise_time, sunset_time = SunCalculator.get_sun_times(
+            result.umi_info
+        )
+
+        high_tides = getattr(
+            result.umi_info,
+            "high_tides",
+            getattr(result.umi_info, "high_tide_list", []),
+        )
+
+        low_tides = getattr(
+            result.umi_info,
+            "low_tides",
+            getattr(result.umi_info, "low_tide_list", []),
+        )
+
+        BoatSafetyEngine.apply_sequence_rules(
+            result.hour_data,
+            sunrise_time,
+            sunset_time,
+            high_tides,
+            low_tides,
+        )
+
+        # ---------------------------------------------------------
+        # 判定結果テーブル
+        # ---------------------------------------------------------
         table_rows = SafetyReportFormatter.build_table_rows(
-            result.hour_data, sunrise_time, sunset_time
+            result.hour_data,
+            sunrise_time,
+            sunset_time,
         )
 
         all_rows = ReportFormatter.build_display_rows(table_rows)
-        display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)
 
-        df = pd.DataFrame([asdict(row) for row in display_rows_filtered])
+        display_rows_filtered = ReportFormatter.filter_display_rows(
+            all_rows
+        )
+
+        df = pd.DataFrame(
+            [asdict(row) for row in display_rows_filtered]
+        )
+
         df = df.rename(
             columns={
                 "time_range": "時間",
@@ -318,52 +423,86 @@ elif st.session_state.current_page == "home":
             }
         )
 
+        # ---------------------------------------------------------
+        # グラフ用データ
+        #
+        # 制限風速・制限波高はここで再計算しない。
+        # engine.py が算出して hour_data に保持した値を使用する。
+        # ---------------------------------------------------------
         graph_data_list = []
+
         for k, v in result.hour_data.items():
-            if SafetyRule.ACTIVITY_START_HOUR <= int(k) <= SafetyRule.ACTIVITY_END_HOUR:
-                status_str = "安全"
-                for row_item in table_rows:
-                    h_val = (
-                        row_item.get("hour")
-                        if isinstance(row_item, dict)
-                        else getattr(row_item, "hour", None)
-                    )
-                    if h_val == int(k):
-                        status_str = (
-                            row_item.get("status")
-                            if isinstance(row_item, dict)
-                            else getattr(row_item, "status", "安全")
-                        )
-                        break
+            if not (
+                SafetyRule.ACTIVITY_START_HOUR
+                <= int(k)
+                <= SafetyRule.ACTIVITY_END_HOUR
+            ):
+                continue
 
-                wind_dir = getattr(v, "wind_dir", 0) or 0
-                is_south = WindJudge.is_south_wind(wind_dir) if hasattr(WindJudge, "is_south_wind") else False
-                is_ebb = getattr(v, "is_ebb", False)
-                wave_h = extract_number(v.wave_height)
-                
-                w_limit = WindJudge.get_limit(is_ebb, is_south, wave_h <= SafetyRule.MAX_WAVE_HEIGHT_NORMAL)
-                w_wave_limit = SafetyRule.MAX_WAVE_HEIGHT_STRICT if (is_south or is_ebb) else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
-                w_tide_limit = SafetyRule.MIN_TIDE_CM
+            status_str = "安全"
 
-                graph_data_list.append(
-                    {
-                        "時間": int(k),
-                        "風速": v.wind_speed if v.wind_speed is not None else 0.0,
-                        "波高": wave_h,
-                        "潮位": extract_number(v.tide),
-                        "降水確率": v.precipitation_probability
-                        if hasattr(v, "precipitation_probability")
-                        and v.precipitation_probability is not None
-                        else 0.0,
-                        "気温": v.temperature
-                        if hasattr(v, "temperature") and v.temperature is not None
-                        else 20.0,
-                        "判定": status_str,
-                        "制限風速": w_limit,
-                        "制限波高": w_wave_limit,
-                        "制限潮位": w_tide_limit,
-                    }
+            for row_item in table_rows:
+                h_val = (
+                    row_item.get("hour")
+                    if isinstance(row_item, dict)
+                    else getattr(row_item, "hour", None)
                 )
+
+                if h_val == int(k):
+                    status_str = (
+                        row_item.get("status")
+                        if isinstance(row_item, dict)
+                        else getattr(
+                            row_item,
+                            "status",
+                            "安全",
+                        )
+                    )
+                    break
+
+            graph_data_list.append(
+                {
+                    "時間": int(k),
+                    "風速": (
+                        v.wind_speed
+                        if v.wind_speed is not None
+                        else 0.0
+                    ),
+                    "波高": extract_number(v.wave_height),
+                    "潮位": extract_number(v.tide),
+                    "降水確率": (
+                        v.precipitation_probability
+                        if getattr(
+                            v,
+                            "precipitation_probability",
+                            None,
+                        )
+                        is not None
+                        else 0.0
+                    ),
+                    "気温": (
+                        v.temperature
+                        if getattr(v, "temperature", None) is not None
+                        else 20.0
+                    ),
+                    "判定": status_str,
+
+                    # engine.py が算出した制限値をそのまま使用
+                    "制限風速": getattr(
+                        v,
+                        "limit_wind",
+                        SafetyRule.WIND_LIMIT_NORMAL,
+                    ),
+                    "制限波高": getattr(
+                        v,
+                        "limit_wave",
+                        SafetyRule.MAX_WAVE_HEIGHT_NORMAL,
+                    ),
+
+                    # 最低潮位は固定ルール
+                    "制限潮位": SafetyRule.MIN_TIDE_CM,
+                }
+            )
 
         df_graph = pd.DataFrame(graph_data_list)
 
