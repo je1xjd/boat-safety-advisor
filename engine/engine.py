@@ -36,6 +36,7 @@ class BoatSafetyEngine:
 
         if not WaveJudge.is_physically_safe(wave_height, swell_period):
             return False
+
         if not WaveJudge.is_complex_safe(wave_height, swell_period):
             return False
 
@@ -51,7 +52,12 @@ class BoatSafetyEngine:
         if wave_height > limit_wave:
             return False
 
-        limit = WindJudge.get_limit(is_ebb, is_south, wave_height <= limit_wave)
+        limit = WindJudge.get_limit(
+            is_ebb,
+            is_south,
+            wave_height <= limit_wave,
+        )
+
         return WindJudge.is_safe(wind_speed, limit, wave_height)
 
     @classmethod
@@ -70,7 +76,12 @@ class BoatSafetyEngine:
         is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
 
         wind_wave_ok = WindWaveEvaluator.judge(
-            hour, wind_speed, wind_dir, wave_height, swell_period, is_ebb
+            hour,
+            wind_speed,
+            wind_dir,
+            wave_height,
+            swell_period,
+            is_ebb,
         )
 
         tide_safe = TideJudge.is_tide_safe(tide_val)
@@ -83,43 +94,77 @@ class BoatSafetyEngine:
         valid_windows = []
 
         for start_hour in range(
-            SafetyRule.ACTIVITY_START_HOUR, SafetyRule.ACTIVITY_END_HOUR + 1
+            SafetyRule.ACTIVITY_START_HOUR,
+            SafetyRule.ACTIVITY_END_HOUR + 1,
         ):
             for end_hour in range(
                 start_hour + SafetyRule.REQUIRED_SAFE_HOURS,
                 SafetyRule.ACTIVITY_END_HOUR + 1,
             ):
-                if not (hour_data[start_hour].is_safe and hour_data[end_hour].is_safe):
+                if not (
+                    hour_data[start_hour].is_safe
+                    and hour_data[end_hour].is_safe
+                ):
                     continue
 
                 all_navigable = True
 
                 for h in range(start_hour, end_hour + 1):
-                    is_ok = h in hour_data and hour_data[h].is_navigable
+                    is_ok = (
+                        h in hour_data
+                        and hour_data[h].is_navigable
+                    )
+
                     if not is_ok:
                         all_navigable = False
                         break
 
                 if all_navigable:
                     duration = end_hour - start_hour
-                    valid_windows.append((start_hour, end_hour, duration))
+                    valid_windows.append(
+                        (start_hour, end_hour, duration)
+                    )
 
-        low_hours = [h for h, data in hour_data.items() if data.is_tide_low()]
+        low_hours = [
+            h
+            for h, data in hour_data.items()
+            if data.is_tide_low()
+        ]
 
         if low_hours:
             first_low = min(low_hours)
             last_low = max(low_hours)
-            before_candidates = [w for w in valid_windows if w[1] < first_low]
-            after_candidates = [w for w in valid_windows if w[0] > last_low]
+
+            before_candidates = [
+                w for w in valid_windows
+                if w[1] < first_low
+            ]
+
+            after_candidates = [
+                w for w in valid_windows
+                if w[0] > last_low
+            ]
         else:
             before_candidates = valid_windows
             after_candidates = []
 
         required = SafetyRule.REQUIRED_SAFE_HOURS
-        before_candidates = [w for w in before_candidates if w[2] >= required]
-        after_candidates = [w for w in after_candidates if w[2] >= required]
 
-        return valid_windows, before_candidates, after_candidates
+        before_candidates = [
+            w for w in before_candidates
+            if w[2] >= required
+        ]
+
+        after_candidates = [
+            w for w in after_candidates
+            if w[2] >= required
+        ]
+
+        return (
+            valid_windows,
+            before_candidates,
+            after_candidates,
+        )
 
     @classmethod
     def get_display_status(
@@ -129,32 +174,49 @@ class BoatSafetyEngine:
         sunrise_time: datetime.time | None,
         sunset_time: datetime.time | None,
     ) -> tuple[str, str]:
-        """UI表示用の海況ステータスとカラーカテゴリを返す（分単位の日出入対応）。"""
+        """UI表示用の海況ステータスとカラーカテゴリを返す。"""
         if 7 <= hour <= 18:
             if data.is_safe:
                 return "安全", "safe"
+
             if getattr(data, "is_tide_warning", False):
                 return "潮位", "tide_low"
+
             return "危険", "danger"
 
-        return ("日没" if hour > 18 else "夜明"), "danger"
+        return (
+            "日没" if hour > 18 else "夜明",
+            "danger",
+        )
 
     @classmethod
     def build_before_after_summary(
-        cls, before_candidates: list, after_candidates: list
+        cls,
+        before_candidates: list,
+        after_candidates: list,
     ) -> tuple[str, str]:
         """潮位低下前後の最適航行時間を要約する。"""
         before_str = "該当なし"
 
         if before_candidates:
-            best_b = max(before_candidates, key=lambda x: x[2])
-            before_str = f"{best_b[0]:02d}-{best_b[1]:02d}時"
+            best_b = max(
+                before_candidates,
+                key=lambda x: x[2],
+            )
+            before_str = (
+                f"{best_b[0]:02d}-{best_b[1]:02d}時"
+            )
 
         after_str = "該当なし"
 
         if after_candidates:
-            best_a = max(after_candidates, key=lambda x: x[2])
-            after_str = f"{best_a[0]:02d}-{best_a[1]:02d}時"
+            best_a = max(
+                after_candidates,
+                key=lambda x: x[2],
+            )
+            after_str = (
+                f"{best_a[0]:02d}-{best_a[1]:02d}時"
+            )
 
         return before_str, after_str
 
@@ -164,7 +226,10 @@ class BoatSafetyEngine:
         if not valid_windows:
             return (0, 0, 0)
 
-        return max(valid_windows, key=lambda x: x[2])
+        return max(
+            valid_windows,
+            key=lambda x: x[2],
+        )
 
     @staticmethod
     def get_ui_tide_text(umi: UmiInfo) -> str:
@@ -178,15 +243,21 @@ class BoatSafetyEngine:
 
     @classmethod
     def judge_sea_condition_pure(
-        cls, wind_speed: float, wave_height: float, swell_period: float
+        cls,
+        wind_speed: float,
+        wave_height: float,
+        swell_period: float,
     ) -> bool:
         """潮位や風向などの運用条件を排除し、純粋な物理的限界のみで海況を判定する。"""
         if wave_height > SafetyRule.MAX_WAVE_HEIGHT_NORMAL:
             return False
+
         if swell_period >= SafetyRule.MAX_SWELL_PERIOD:
             return False
+
         if wind_speed > SafetyRule.WIND_LIMIT_NORMAL:
             return False
+
         return True
 
     @classmethod
@@ -198,70 +269,130 @@ class BoatSafetyEngine:
         high_tides: list[int] | None = None,
         low_tides: list[int] | None = None,
     ):
-        """時間帯ごとの物理的安全性と潮位低下によるリスクをシーケンスで判定する（分単位の日出入対応）。"""
+        """時間帯ごとの物理的安全性と潮位低下によるリスクをシーケンスで判定する。"""
         from engine.wind import WindJudge
 
         hours = sorted(hour_data.keys())
 
         for hour in hours:
             data = hour_data[hour]
-            
-            # 💡 エンジン側で各時間の limit_wave と limit_wind を確実に算出してオブジェクトに保持させる
+
+            # 各時間の制限波高・制限風速を算出して保持する
             if high_tides is not None and low_tides is not None:
-                is_south = WindJudge.is_south_wind(getattr(data, "wind_dir", 0))
-                is_ebb = TideJudge.is_ebbing_tide(hour, high_tides, low_tides)
-                
+                is_south = WindJudge.is_south_wind(
+                    getattr(data, "wind_dir", 0)
+                )
+
+                is_ebb = TideJudge.is_ebbing_tide(
+                    hour,
+                    high_tides,
+                    low_tides,
+                )
+
                 limit_wave = (
                     SafetyRule.MAX_WAVE_HEIGHT_STRICT
                     if (is_south or is_ebb)
                     else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
                 )
+
                 limit_wind = WindJudge.get_limit(
-                    is_ebb, is_south, getattr(data, "wave_height", 0) <= limit_wave
+                    is_ebb,
+                    is_south,
+                    getattr(data, "wave_height", 0)
+                    <= limit_wave,
                 )
-                
-                # オブジェクトへ保持
+
                 data.limit_wave = limit_wave
                 data.limit_wind = limit_wind
 
-            if sunrise_time is not None and sunset_time is not None:
+            if (
+                sunrise_time is not None
+                and sunset_time is not None
+            ):
                 target_time = datetime.time(hour, 0)
-                is_time_ok = sunrise_time <= target_time < sunset_time
+
+                is_time_ok = (
+                    sunrise_time
+                    <= target_time
+                    < sunset_time
+                )
             else:
                 is_time_ok = 7 <= hour <= 18
 
-            data.is_safe = is_time_ok and data.wind_wave_safe
+            data.is_safe = (
+                is_time_ok
+                and data.wind_wave_safe
+            )
+
             data.is_tide_warning = False
 
         i = 0
+
         while i < len(hours):
             if hour_data[hours[i]].is_tide_low():
                 start = i
-                while i < len(hours) and hour_data[hours[i]].is_tide_low():
+
+                while (
+                    i < len(hours)
+                    and hour_data[hours[i]].is_tide_low()
+                ):
                     i += 1
+
                 end = i - 1
 
-                prev_h = hours[start - 1] if start > 0 else None
-                next_h = hours[end + 1] if end < len(hours) - 1 else None
+                prev_h = (
+                    hours[start - 1]
+                    if start > 0
+                    else None
+                )
 
-                prev_safe = prev_h is not None and hour_data[prev_h].is_safe
-                next_safe = next_h is not None and hour_data[next_h].is_safe
+                next_h = (
+                    hours[end + 1]
+                    if end < len(hours) - 1
+                    else None
+                )
+
+                prev_safe = (
+                    prev_h is not None
+                    and hour_data[prev_h].is_safe
+                )
+
+                next_safe = (
+                    next_h is not None
+                    and hour_data[next_h].is_safe
+                )
 
                 if prev_safe and next_safe:
                     for idx in range(start, end + 1):
-                        hour_data[hours[idx]].is_tide_warning = True
-                        hour_data[hours[idx]].is_safe = False
+                        hour_data[
+                            hours[idx]
+                        ].is_tide_warning = True
+
+                        hour_data[
+                            hours[idx]
+                        ].is_safe = False
                 else:
                     for idx in range(start, end + 1):
-                        hour_data[hours[idx]].is_safe = False
+                        hour_data[
+                            hours[idx]
+                        ].is_safe = False
             else:
                 i += 1
 
     @classmethod
-    def get_status_strict(cls, hour_data: HourForecast, tide_cm: float | None) -> str:
+    def get_status_strict(
+        cls,
+        hour_data: HourForecast,
+        tide_cm: float | None,
+    ) -> str:
         """物理条件と潮位のみに基づき、現在のステータスを判定する。"""
         if not hour_data.wind_wave_safe:
             return "danger"
-        if tide_cm is not None and tide_cm < SafetyRule.MIN_TIDE_CM:
+
+        if (
+            tide_cm is not None
+            and tide_cm < SafetyRule.MIN_TIDE_CM
+        ):
             return "tide_low"
+
         return "safe"
