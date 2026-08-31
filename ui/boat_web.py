@@ -212,7 +212,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
     判定結果のデータフレームと各種グラフを表示するタブUIエリアを構築する。
     """
     tab1, tab_wind, tab_wave, tab_swell, tab_tide, tab_precip_temp = st.tabs(
-        ["📊 判定結果", "🍃 風速", "🌊 波高", "🌊 周期", "🚢 潮位", "🌧 降水・気温"]
+        ["📊 判定結果", "🍃 風速", "🌊 波高", "〰️ 周期", "🚢 潮位", "🌧 降水・気温"]
     )
 
     with tab1:
