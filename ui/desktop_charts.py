@@ -156,7 +156,7 @@ def render_all_desktop_graphs(
         hours,
         swells,
         ylabel="周期(s)",
-        color="#20b2aa",
+        color=SafetyRule.SWELL_COLOR,
         y_lim=swell_dynamic_top,
         threshold=swell_limits,
         threshold_label="制限周期",

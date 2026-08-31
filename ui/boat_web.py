@@ -270,7 +270,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
             draw_fixed_chart(
                 df_graph,
                 "周期",
-                "#20b2aa",
+                SafetyRule.SWELL_COLOR,
                 limit_val="制限周期",
                 limit_label="制限周期",
             ),
