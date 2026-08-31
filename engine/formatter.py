@@ -98,42 +98,58 @@ class SafetyReportFormatter:
         sunrise_time: datetime.time | None,
         sunset_time: datetime.time | None,
     ) -> dict:
-        """単一時間帯のデータをUI表示用辞書に整形する（潮位の右側に降水・気温を配置）。"""
+        """単一時間帯のデータをUI表示用辞書に整形する。"""
         status, tag = BoatSafetyEngine.get_display_status(
             hour, data, sunrise_time, sunset_time
         )
 
-        # 降水確率の整数四捨五入
-        precip_text = "取得失敗"
-        if (
-            hasattr(data, "precipitation_probability")
-            and data.precipitation_probability is not None
-        ):
-            precip_text = f"{round(data.precipitation_probability, -1):.0f}%"
-        elif hasattr(data, "precip_prob") and data.precip_prob is not None:
-            precip_text = f"{round(data.precip_prob, -1):.0f}%"
-        # 気温のフォーマット
-        temp_text = "取得失敗"
-        if hasattr(data, "temperature") and data.temperature is not None:
-            temp_text = f"{data.temperature:.1f}℃"
-        elif hasattr(data, "temp") and data.temp is not None:
-            temp_text = f"{data.temp:.0f}℃"
+        # 各種気象・海象データのフォーマット（統一された記述）
+        wind_text = (
+            f"{data.wind_speed:.1f}m/s"
+            if getattr(data, "wind_speed", None) is not None
+            else "取得失敗"
+        )
+        wave_text = (
+            f"{data.wave_height:.2f}m"
+            if getattr(data, "wave_height", None) is not None
+            else "取得失敗"
+        )
+        swell_text = (
+            f"{getattr(data, 'swell_period', getattr(data, 'swell', None)):.1f}s"
+            if getattr(data, "swell_period", getattr(data, 'swell', None)) is not None
+            else "取得失敗"
+        )
+        tide_text = (
+            f"{int(data.tide)}cm"
+            if getattr(data, "tide", None) is not None
+            else "取得失敗"
+        )
+
+        precip_val = getattr(data, "precipitation_probability", getattr(data, "precip_prob", None))
+        precip_text = (
+            f"{round(precip_val, -1):.0f}%"
+            if precip_val is not None
+            else "取得失敗"
+        )
+
+        temp_val = getattr(data, "temperature", getattr(data, "temp", None))
+        temp_text = (
+            f"{temp_val:.1f}℃" if temp_val is not None else "取得失敗"
+        )
 
         return {
             "hour": hour,
             "status": status,
             "tag": tag,
-            "direction": data.dir_kanji,
-            "wind_text": f"{data.wind_speed:.1f}m/s"
-            if data.wind_speed is not None
-            else "取得失敗",
-            "wave_text": f"{data.wave_height:.2f}m"
-            if data.wave_height is not None
-            else "取得失敗",
-            "tide_text": f"{int(data.tide)}cm" if data.tide is not None else "取得失敗",
+            "direction": getattr(data, "dir_kanji", "-"),
+            "wind_text": wind_text,
+            "wave_text": wave_text,
+            "swell_text": swell_text,
+            "tide_text": tide_text,
             "precip_text": precip_text,
             "temp_text": temp_text,
         }
+
 
     @staticmethod
     def build_summary_text(summary: dict) -> str:
@@ -165,6 +181,7 @@ class UIRow:
     direction: str
     wind: str
     wave: str
+    swell: str
     tide: str
     precip: str
     temp: str
@@ -184,6 +201,7 @@ class ReportFormatter:
                 direction=r["direction"],
                 wind=r["wind_text"],
                 wave=r["wave_text"],
+                swell=r["swell_text"],
                 tide=r["tide_text"],
                 precip=r["precip_text"],
                 temp=r["temp_text"],
