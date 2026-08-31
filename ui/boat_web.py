@@ -21,6 +21,7 @@ from engine import (
     BoatSafetyEngine,
     SafetyRule,
     StatusFormatter,
+    WaveJudge,
 )
 from engine.formatter import (
     ReportFormatter,
@@ -210,8 +211,8 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
     """
     判定結果のデータフレームと各種グラフを表示するタブUIエリアを構築する。
     """
-    tab1, tab_wind, tab_wave, tab_tide, tab_precip_temp = st.tabs(
-        ["📊 判定結果", "🍃 風速", "🌊 波高", "🚢 潮位", "🌧 降水・気温"]
+    tab1, tab_wind, tab_wave, tab_swell, tab_tide, tab_precip_temp = st.tabs(
+        ["📊 判定結果", "🍃 風速", "🌊 波高", "🌊 周期", "🚢 潮位", "🌧 降水・気温"]
     )
 
     with tab1:
@@ -223,6 +224,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                     "風向",
                     "風速",
                     "波高",
+                    "周期",
                     "潮位",
                     "降水",
                     "気温",
@@ -257,6 +259,20 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 SafetyRule.WAVE_COLOR,
                 limit_val="制限波高",
                 limit_label="制限波高",
+            ),
+            width="stretch",
+        )
+
+    with tab_swell:
+        st.subheader("周期 (s)")
+
+        st.altair_chart(
+            draw_fixed_chart(
+                df_graph,
+                "周期",
+                "#20b2aa",
+                limit_val="制限周期",
+                limit_label="制限周期",
             ),
             width="stretch",
         )
@@ -356,15 +372,6 @@ elif st.session_state.current_page == "home":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # ---------------------------------------------------------
-        # engine.py と同じルール適用処理を実行する
-        #
-        # ここで各時間の
-        #   - limit_wind
-        #   - limit_wave
-        # が engine.py 側で算出され、hour_data に保持される。
-        # Web版では制限値を独自に再計算しない。
-        # ---------------------------------------------------------
         sunrise_time, sunset_time = SunCalculator.get_sun_times(
             result.umi_info
         )
@@ -415,6 +422,7 @@ elif st.session_state.current_page == "home":
                 "direction": "風向",
                 "wind": "風速",
                 "wave": "波高",
+                "swell": "周期",
                 "tide": "潮位",
                 "precip": "降水",
                 "temp": "気温",
@@ -423,9 +431,6 @@ elif st.session_state.current_page == "home":
 
         # ---------------------------------------------------------
         # グラフ用データ
-        #
-        # 制限風速・制限波高はここで再計算しない。
-        # engine.py が算出して hour_data に保持した値を使用する。
         # ---------------------------------------------------------
         graph_data_list = []
 
@@ -458,6 +463,9 @@ elif st.session_state.current_page == "home":
                     )
                     break
 
+            swell_val = getattr(v, "swell_period", getattr(v, "swell", 0.0))
+            limit_swell_val = getattr(v, "limit_swell", WaveJudge.get_limit_swell(v.wave_height))
+
             graph_data_list.append(
                 {
                     "時間": int(k),
@@ -467,6 +475,7 @@ elif st.session_state.current_page == "home":
                         else 0.0
                     ),
                     "波高": extract_number(v.wave_height),
+                    "周期": extract_number(swell_val),
                     "潮位": extract_number(v.tide),
                     "降水確率": (
                         v.precipitation_probability
@@ -485,7 +494,7 @@ elif st.session_state.current_page == "home":
                     ),
                     "判定": status_str,
 
-                    # engine.py が算出した制限値をそのまま使用
+                    # 各種制限値
                     "制限風速": getattr(
                         v,
                         "limit_wind",
@@ -496,8 +505,7 @@ elif st.session_state.current_page == "home":
                         "limit_wave",
                         SafetyRule.MAX_WAVE_HEIGHT_NORMAL,
                     ),
-
-                    # 最低潮位は固定ルール
+                    "制限周期": limit_swell_val,
                     "制限潮位": SafetyRule.MIN_TIDE_CM,
                 }
             )

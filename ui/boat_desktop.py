@@ -209,6 +209,9 @@ class BoatSafetyApp:
         self.wave_tab = tk.Frame(self.notebook)
         self.notebook.add(self.wave_tab, text="🌊 波高グラフ")
 
+        self.swell_tab = tk.Frame(self.notebook)
+        self.notebook.add(self.swell_tab, text="〰️ 周期グラフ")
+
         self.tide_tab = tk.Frame(self.notebook)
         self.notebook.add(self.tide_tab, text="🚢 潮位グラフ")
 
@@ -221,6 +224,7 @@ class BoatSafetyApp:
             "direction",
             "wind",
             "wave",
+            "swell",
             "tide",
             "precip",
             "temp",
@@ -231,6 +235,7 @@ class BoatSafetyApp:
             "direction": "風向",
             "wind": "風速",
             "wave": "波高",
+            "swell": "周期",
             "tide": "潮位",
             "precip": "降水",
             "temp": "気温",
@@ -241,7 +246,7 @@ class BoatSafetyApp:
         )
         for col_key, header_title in TABLE_HEADERS.items():
             self.result_tree.heading(col_key, text=header_title)
-            width = 85 if col_key in ("precip", "temp") else 110
+            width = 85 if col_key in ("precip", "temp") else 95
             self.result_tree.column(col_key, width=width, anchor="center", stretch=True)
 
         tree_scroll = ttk.Scrollbar(
@@ -310,7 +315,6 @@ class BoatSafetyApp:
             self.result_tree.delete(*self.result_tree.get_children())
             sunrise_time, sunset_time = SunCalculator.get_sun_times(umi_info)
 
-            # 💡 ルール適用処理
             high_tides = getattr(umi_info, "high_tides", getattr(umi_info, "high_tide_list", []))
             low_tides = getattr(umi_info, "low_tides", getattr(umi_info, "low_tide_list", []))
 
@@ -328,6 +332,7 @@ class BoatSafetyApp:
 
             all_rows = ReportFormatter.build_display_rows(table_rows)
             display_rows_filtered = ReportFormatter.filter_display_rows(all_rows)
+            
             for row in display_rows_filtered:
                 self.result_tree.insert(
                     "",
@@ -338,6 +343,7 @@ class BoatSafetyApp:
                         row.direction,
                         row.wind,
                         row.wave,
+                        row.swell,  # 💡 修正済み: 正しく周期データを渡す
                         row.tide,
                         row.precip,
                         row.temp,
@@ -345,8 +351,14 @@ class BoatSafetyApp:
                     tags=(row.tag,),
                 )
 
+            # 💡 修正済み: 周期グラフタブ (self.swell_tab) を引数に追加
             render_all_desktop_graphs(
-                self.wind_tab, self.wave_tab, self.tide_tab, self.precip_tab, hour_data
+                self.wind_tab, 
+                self.wave_tab, 
+                self.swell_tab, 
+                self.tide_tab, 
+                self.precip_tab, 
+                hour_data
             )
 
             ui_data = SafetyReportFormatter.get_ui_summary_data(summary)

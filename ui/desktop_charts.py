@@ -9,7 +9,7 @@ Tkinterアプリケーション（Matplotlib）で使用する海況グラフの
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from engine import SafetyRule
+from engine import SafetyRule, WaveJudge
 
 
 # モジュールロード時に1回だけフォントを設定
@@ -38,12 +38,13 @@ def dispose_desktop_graphs():
 def render_all_desktop_graphs(
     wind_tab,
     wave_tab,
+    swell_tab,  # 周期グラフタブ
     tide_tab,
     precip_tab,
     hour_data,
 ):
     """
-    風速・波高・潮位・降水気温のグラフを指定されたタブ内に一括描画する。
+    風速・波高・周期・潮位・降水気温のグラフを指定されたタブ内に一括描画する。
     """
     filtered_items = {
         k: v
@@ -67,6 +68,12 @@ def render_all_desktop_graphs(
 
     waves = [
         v.wave_height
+        for v in filtered_items.values()
+    ]
+
+    # 周期データのリストを取得（swell_period または swell に対応）
+    swells = [
+        getattr(v, "swell_period", getattr(v, "swell", 0.0))
         for v in filtered_items.values()
     ]
 
@@ -94,7 +101,6 @@ def render_all_desktop_graphs(
         v.limit_wind
         for v in filtered_items.values()
     ]
-    # 制限値の最大値を基に上限を動的計算（下限は0固定）
     wind_limit_max = max(wind_limits) if wind_limits else SafetyRule.WIND_LIMIT_NORMAL
     wind_data_max = max(winds) if winds else 0
     wind_dynamic_top = max(wind_limit_max * 2.0, wind_data_max * 1.1)
@@ -117,7 +123,6 @@ def render_all_desktop_graphs(
         v.limit_wave
         for v in filtered_items.values()
     ]
-    # 制限値の最大値を基に上限を動的計算（下限は0固定）
     wave_limit_max = max(wave_limits) if wave_limits else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
     wave_data_max = max(waves) if waves else 0
     wave_dynamic_top = max(wave_limit_max * 2.0, wave_data_max * 1.1)
@@ -135,8 +140,30 @@ def render_all_desktop_graphs(
         y_min=0,
     )
 
-    # --- 3. 潮位グラフ ---
-    # マイナス潮位にも対応できるよう下限を動的に設定（既存の仕様を維持）
+    # --- 3. 周期グラフ ---
+    swell_limits = [
+        getattr(v, "limit_swell", WaveJudge.get_limit_swell(v.wave_height))
+        for v in filtered_items.values()
+    ]
+    swell_limit_max = max(swell_limits) if swell_limits else SafetyRule.MAX_SWELL_PERIOD
+    swell_data_max = max(swells) if swells else 0
+    
+    swell_dynamic_top = max(swell_limit_max * 2.0, swell_data_max * 1.1, 15.0)
+
+    _update_or_create_single_chart(
+        swell_tab,
+        "swell",
+        hours,
+        swells,
+        ylabel="周期(s)",
+        color="#20b2aa",
+        y_lim=swell_dynamic_top,
+        threshold=swell_limits,
+        threshold_label="制限周期",
+        y_min=0,
+    )
+
+    # --- 4. 潮位グラフ ---
     tide_min = min(tides) if tides else 0
     tide_max = max(tides) if tides else 0
 
@@ -160,7 +187,7 @@ def render_all_desktop_graphs(
         y_min=tide_ylim_bottom,
     )
 
-    # --- 4. 降水・気温グラフ ---
+    # --- 5. 降水・気温グラフ ---
     _update_or_create_dual_chart(
         precip_tab,
         "precip_temp",
