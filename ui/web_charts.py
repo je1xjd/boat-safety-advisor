@@ -26,6 +26,7 @@ def draw_fixed_chart(
     limit_label: str = None,
     y_max: float = None,
     y_min: float = 0,  # デフォルトを0に設定（風・波は0固定）
+    is_lower_danger: bool = False, # 潮位などのように下回ると危険な場合はTrue
 ) -> alt.Chart:
     """指定された条件と制限値（固定値または動的配列/列）に基づいてAltairチャートを生成する。"""
     
@@ -59,13 +60,14 @@ def draw_fixed_chart(
             "nice": False,
         }
     else:
-        # 風や波などのように下限が0の場合（"nice": False で勝手に上限が広がるのを防ぐ）[cite: 8]
+        # 風や波などのように下限が0の場合（"nice": False で勝手に上限が広がるのを防ぐ）
         y_scale_args = {
             "zero": True,
             "domain": [0, final_max],
             "nice": False,
         }
 
+    # 基本の折れ線グラフレイヤー
     line = (
         alt.Chart(df)
         .mark_line(point=True, color=color)
@@ -100,15 +102,22 @@ def draw_fixed_chart(
         )
     )
 
+    layers = [line]
+
     if limit_val is not None:
         label_text = limit_label or "制限値"
+        temp_df = df.copy()
         
-        # 💡 limit_val が DataFrame の列名である場合[cite: 8]
-        if isinstance(limit_val, str) and limit_val in df.columns:
-            temp_df = df.copy()
+        # 危険側の判定（潮位は下回った場合、それ以外は上回った場合）
+        # ※呼び出し元で is_lower_danger が指定されていない場合も考慮して "潮位" という文字列でフォールバック判定
+        lower_danger = is_lower_danger or (y_col == "潮位")
+        
+        # 💡 limit_val の型に応じた制限値ラインの作成と、比較用Seriesの取得
+        if isinstance(limit_val, str) and limit_val in temp_df.columns:
             temp_df["_limit_legend"] = label_text
+            lim_series = temp_df[limit_val]
             
-            limit_line = (
+            limit_layer = (
                 alt.Chart(temp_df)
                 .mark_line(strokeDash=[4, 4], size=2)
                 .encode(
@@ -124,15 +133,14 @@ def draw_fixed_chart(
                     tooltip=[alt.Tooltip(f"{limit_val}:Q", title=label_text, format=".1f")]
                 )
             )
-            chart = alt.layer(line, limit_line).properties(height=300)
+            layers.append(limit_layer)
             
         elif isinstance(limit_val, (list, tuple)):
-            # リストが直接渡された場合[cite: 8]
-            temp_df = df.copy()
             temp_df["_dynamic_limit"] = list(limit_val)
             temp_df["_limit_legend"] = label_text
+            lim_series = temp_df["_dynamic_limit"]
             
-            limit_line = (
+            limit_layer = (
                 alt.Chart(temp_df)
                 .mark_line(strokeDash=[4, 4], size=2)
                 .encode(
@@ -147,11 +155,12 @@ def draw_fixed_chart(
                     ),
                 )
             )
-            chart = alt.layer(line, limit_line).properties(height=300)
+            layers.append(limit_layer)
         else:
-            # 従来どおりの単一の数値（水平線）[cite: 8]
-            rule_df = pd.DataFrame([{"y_val": float(limit_val), "legend_label": label_text}])
-            rule = (
+            lim_series = float(limit_val)
+            rule_df = pd.DataFrame([{"y_val": lim_series, "legend_label": label_text}])
+            
+            limit_layer = (
                 alt.Chart(rule_df)
                 .mark_rule(color="red", strokeDash=[4, 4], size=2)
                 .encode(
@@ -166,9 +175,33 @@ def draw_fixed_chart(
                     ),
                 )
             )
-            chart = alt.layer(line, rule).properties(height=300)
-    else:
-        chart = line.properties(height=300)
+            layers.append(limit_layer)
+
+        # --- 危険ポイント（制限値超過）の「✖」マーク描画 ---
+        if lower_danger:
+            danger_mask = temp_df[y_col] < lim_series
+        else:
+            danger_mask = temp_df[y_col] > lim_series
+            
+        danger_df = temp_df[danger_mask].copy()
+        
+        if not danger_df.empty:
+            danger_points = (
+                alt.Chart(danger_df)
+                .mark_text(text="✖", color="red", size=22, baseline="middle", align="center")
+                .encode(
+                    x="時間:Q",
+                    y=alt.Y(f"{y_col}:Q"),
+                    tooltip=[
+                        alt.Tooltip("時間:Q", title="時間", format="d"),
+                        alt.Tooltip(f"{y_col}:Q", title=y_col, format=".1f"),
+                    ]
+                )
+            )
+            layers.append(danger_points)
+
+    # 用意したレイヤーをすべて重ね合わせる
+    chart = alt.layer(*layers).properties(height=300)
 
     return chart.configure_axis(
         grid=True, gridColor="#E0E0E0", gridDash=[2, 2], gridWidth=0.5
@@ -197,7 +230,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         ),
     )
 
-    # 左軸：降水確率（棒グラフ）[cite: 8]
+    # 左軸：降水確率（棒グラフ）
     bars = (
         alt.Chart(df)
         .mark_bar(color="#4682b4", opacity=0.55, width=18)
@@ -216,7 +249,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         )
     )
 
-    # 右軸：気温（折れ線グラフ）[cite: 8]
+    # 右軸：気温（折れ線グラフ）
     temp_min = df["気温"].min() if not df.empty else 0
     temp_max = df["気温"].max() if not df.empty else 30
 
@@ -249,7 +282,7 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         )
     )
 
-    # レイヤー結合（背景なし、独立したY軸スケールを適用）[cite: 8]
+    # レイヤー結合（背景なし、独立したY軸スケールを適用）
     chart = (
         alt.layer(bars, lines)
         .resolve_scale(y="independent")

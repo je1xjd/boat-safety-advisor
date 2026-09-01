@@ -116,6 +116,7 @@ def render_all_desktop_graphs(
         threshold=wind_limits,
         threshold_label="制限風速",
         y_min=0,
+        is_lower_danger=False,
     )
 
     # --- 2. 波高グラフ ---
@@ -138,6 +139,7 @@ def render_all_desktop_graphs(
         threshold=wave_limits,
         threshold_label="制限波高",
         y_min=0,
+        is_lower_danger=False,
     )
 
     # --- 3. 周期グラフ ---
@@ -161,9 +163,10 @@ def render_all_desktop_graphs(
         threshold=swell_limits,
         threshold_label="制限周期",
         y_min=0,
+        is_lower_danger=False,
     )
 
-    # --- 4. 潮位グラフ ---
+    # --- 4. 潮位グラフ（潮位は下回ると危険なので is_lower_danger=True） ---
     tide_min = min(tides) if tides else 0
     tide_max = max(tides) if tides else 0
 
@@ -185,6 +188,7 @@ def render_all_desktop_graphs(
         threshold=SafetyRule.MIN_TIDE_CM,
         threshold_label="最低潮位",
         y_min=tide_ylim_bottom,
+        is_lower_danger=True,
     )
 
     # --- 5. 降水・気温グラフ ---
@@ -208,6 +212,7 @@ def _update_or_create_single_chart(
     threshold=None,
     threshold_label=None,
     y_min=0,
+    is_lower_danger=False,
 ):
     """単一軸グラフを初回作成または再利用して描画する。"""
     if (
@@ -242,15 +247,49 @@ def _update_or_create_single_chart(
 
     ax.clear()
 
-    # 実測・予報データ
+    # 実測・予報データ（基本の折れ線）
     ax.plot(
         hours,
         data,
         color=color,
         marker="o",
+        linestyle="-",
     )
 
-    # 制限値
+    # 制限値を超えたポイントを赤い「✖」で強調表示する処理（ラベルなし）
+    if threshold is not None:
+        if isinstance(threshold, (list, tuple)):
+            threshold_list = threshold
+        else:
+            threshold_list = [threshold] * len(hours)
+
+        danger_hours = []
+        danger_vals = []
+
+        for h, val, th in zip(hours, data, threshold_list):
+            if is_lower_danger:
+                # 潮位などのように、制限値を「下回ると」危険な場合
+                if val < th:
+                    danger_hours.append(h)
+                    danger_vals.append(val)
+            else:
+                # 風波などのように、制限値を「上回ると」危険な場合
+                if val > th:
+                    danger_hours.append(h)
+                    danger_vals.append(val)
+
+        if danger_hours:
+            ax.scatter(
+                danger_hours,
+                danger_vals,
+                color="red",
+                marker="x",
+                s=90,
+                linewidths=2.5,
+                zorder=5,
+            )
+
+    # 制限値のラインを描画
     if threshold is not None:
         if isinstance(threshold, (list, tuple)):
             # 時間ごとに異なる制限値
