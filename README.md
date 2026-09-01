@@ -8,6 +8,8 @@
 - 海況情報取得
 - 潮汐情報取得
 - 風向・風速判定
+- 波高・周期判定
+- 潮位判定
 - 出港可否判定
 
 ## 実行方法
@@ -21,5 +23,5 @@ python main.py
 Web版
 
 ```bash
-streamlit run streamlit_app.py
+python main.py --mode web
 ```
