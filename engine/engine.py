@@ -175,7 +175,7 @@ class BoatSafetyEngine:
         sunset_time: datetime.time | None,
     ) -> tuple[str, str]:
         """UI表示用の海況ステータスとカラーカテゴリを返す。"""
-        if 7 <= hour <= 18:
+        if SafetyRule.ACTIVITY_START_HOUR <= hour <= SafetyRule.ACTIVITY_END_HOUR:
             if data.is_safe:
                 return "安全", "safe"
 
@@ -185,9 +185,16 @@ class BoatSafetyEngine:
             return "危険", "danger"
 
         return (
-            "日没" if hour > 18 else "夜明",
+            "日没" if hour > SafetyRule.ACTIVITY_END_HOUR else "夜明",
             "danger",
         )
+
+    @classmethod
+    def _get_longest_window(cls, windows: list) -> tuple:
+        """ウィンドウのリストから最も長い期間（インデックス2が最大）のものを返す。"""
+        if not windows:
+            return (0, 0, 0)
+        return max(windows, key=lambda x: x[2])
 
     @classmethod
     def build_before_after_summary(
@@ -199,10 +206,7 @@ class BoatSafetyEngine:
         before_str = "該当なし"
 
         if before_candidates:
-            best_b = max(
-                before_candidates,
-                key=lambda x: x[2],
-            )
+            best_b = cls._get_longest_window(before_candidates)
             before_str = (
                 f"{best_b[0]:02d}-{best_b[1]:02d}時"
             )
@@ -210,10 +214,7 @@ class BoatSafetyEngine:
         after_str = "該当なし"
 
         if after_candidates:
-            best_a = max(
-                after_candidates,
-                key=lambda x: x[2],
-            )
+            best_a = cls._get_longest_window(after_candidates)
             after_str = (
                 f"{best_a[0]:02d}-{best_a[1]:02d}時"
             )
@@ -223,13 +224,7 @@ class BoatSafetyEngine:
     @classmethod
     def get_best_window(cls, valid_windows: list) -> tuple:
         """航行可能な時間帯のうち、最も長い期間を返す。"""
-        if not valid_windows:
-            return (0, 0, 0)
-
-        return max(
-            valid_windows,
-            key=lambda x: x[2],
-        )
+        return cls._get_longest_window(valid_windows)
 
     @staticmethod
     def get_ui_tide_text(umi: UmiInfo) -> str:
@@ -240,25 +235,6 @@ class BoatSafetyEngine:
             f"🌗 月齢: {umi.moon_age}   "
             f"🌅 日出: {umi.sun_rise} ／ 日入: {umi.sun_set}"
         )
-
-    @classmethod
-    def judge_sea_condition_pure(
-        cls,
-        wind_speed: float,
-        wave_height: float,
-        swell_period: float,
-    ) -> bool:
-        """潮位や風向などの運用条件を排除し、純粋な物理的限界のみで海況を判定する。"""
-        if wave_height > SafetyRule.MAX_WAVE_HEIGHT_NORMAL:
-            return False
-
-        if swell_period >= SafetyRule.MAX_SWELL_PERIOD:
-            return False
-
-        if wind_speed > SafetyRule.WIND_LIMIT_NORMAL:
-            return False
-
-        return True
 
     @classmethod
     def apply_sequence_rules(
@@ -305,7 +281,7 @@ class BoatSafetyEngine:
                 data.limit_wave = limit_wave
                 data.limit_wind = limit_wind
 
-                # 動的制限値（limit_wave, limit_wind）を反映して wind_wave_safe を更新
+                # 動的制限値を反映して wind_wave_safe を更新する
                 wind_speed = getattr(data, "wind_speed", 0)
                 wave_height = getattr(data, "wave_height", 0)
                 swell_period = getattr(data, "swell_period", getattr(data, "swell", 0.0))
@@ -333,7 +309,7 @@ class BoatSafetyEngine:
                     < sunset_time
                 )
             else:
-                is_time_ok = 7 <= hour <= 18
+                is_time_ok = SafetyRule.ACTIVITY_START_HOUR <= hour <= SafetyRule.ACTIVITY_END_HOUR
 
             data.is_safe = (
                 is_time_ok
