@@ -305,6 +305,22 @@ class BoatSafetyEngine:
                 data.limit_wave = limit_wave
                 data.limit_wind = limit_wind
 
+                # 動的制限値（limit_wave, limit_wind）を反映して wind_wave_safe を更新
+                wind_speed = getattr(data, "wind_speed", 0)
+                wave_height = getattr(data, "wave_height", 0)
+                swell_period = getattr(data, "swell_period", getattr(data, "swell", 0.0))
+
+                is_physically_safe = WaveJudge.is_physically_safe(wave_height, swell_period)
+                is_complex_safe = WaveJudge.is_complex_safe(wave_height, swell_period)
+                is_wind_safe = WindJudge.is_safe(wind_speed, limit_wind, wave_height)
+
+                data.wind_wave_safe = (
+                    is_physically_safe
+                    and is_complex_safe
+                    and (wave_height <= limit_wave)
+                    and is_wind_safe
+                )
+
             if (
                 sunrise_time is not None
                 and sunset_time is not None
