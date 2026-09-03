@@ -22,18 +22,16 @@ def draw_fixed_chart(
     df: pd.DataFrame,
     y_col: str,
     color: str,
-    limit_val: float | list | str = None,  # 数値だけでなくリストや列名も許容
+    limit_val: float | list | str = None,
     limit_label: str = None,
     y_max: float = None,
-    y_min: float = 0,  # デフォルトを0に設定（風・波は0固定）
-    is_lower_danger: bool = False, # 潮位などのように下回ると危険な場合はTrue
+    y_min: float = 0,
+    is_lower_danger: bool = False,
 ) -> alt.Chart:
-    """指定された条件と制限値（固定値または動的配列/列）に基づいてAltairチャートを生成する。"""
+    """指定された条件と制限値に基づいてAltairチャートを生成する。"""
     
-    # --- 💡 動的なY軸ドメイン（上限・下限）の算出 ---
     data_max = df[y_col].max() if not df[y_col].empty else 0
     
-    # 制限値の最大値を取得
     lim_max = 0
     if isinstance(limit_val, str) and limit_val in df.columns:
         lim_max = df[limit_val].max()
@@ -42,17 +40,13 @@ def draw_fixed_chart(
     elif limit_val is not None:
         lim_max = float(limit_val)
 
-    # 1. 制限値がある場合は「制限値の2倍」をベース上限とする（常に真ん中付近に制限値が来るようにする）
-    # 2. 予測データ(data_max)がそれを超えて大きくなっている場合は、データに合わせてさらに拡張する
     if lim_max > 0:
         calculated_max = max(lim_max * 2.0, data_max * 1.1)
     else:
-        # 制限値がない一般的な項目の場合
         calculated_max = max(data_max * 1.1, 10.0)
 
     final_max = y_max if y_max is not None else calculated_max
 
-    # 💡 y_min がマイナス（潮位など）の場合は zero=False にし、マイナス側の指定を有効にする
     if y_min < 0:
         y_scale_args = {
             "zero": False,
@@ -60,14 +54,12 @@ def draw_fixed_chart(
             "nice": False,
         }
     else:
-        # 風や波などのように下限が0の場合（"nice": False で勝手に上限が広がるのを防ぐ）
         y_scale_args = {
             "zero": True,
             "domain": [0, final_max],
             "nice": False,
         }
 
-    # 基本の折れ線グラフレイヤー
     line = (
         alt.Chart(df)
         .mark_line(point=True, color=color)
@@ -108,11 +100,8 @@ def draw_fixed_chart(
         label_text = limit_label or "制限値"
         temp_df = df.copy()
         
-        # 危険側の判定（潮位は下回った場合、それ以外は上回った場合）
-        # ※呼び出し元で is_lower_danger が指定されていない場合も考慮して "潮位" という文字列でフォールバック判定
         lower_danger = is_lower_danger or (y_col == "潮位")
         
-        # 💡 limit_val の型に応じた制限値ラインの作成と、比較用Seriesの取得
         if isinstance(limit_val, str) and limit_val in temp_df.columns:
             temp_df["_limit_legend"] = label_text
             lim_series = temp_df[limit_val]
@@ -177,7 +166,6 @@ def draw_fixed_chart(
             )
             layers.append(limit_layer)
 
-        # --- 危険ポイント（制限値超過）の「✖」マーク描画 ---
         if lower_danger:
             danger_mask = temp_df[y_col] < lim_series
         else:
@@ -200,7 +188,6 @@ def draw_fixed_chart(
             )
             layers.append(danger_points)
 
-    # 用意したレイヤーをすべて重ね合わせる
     chart = alt.layer(*layers).properties(height=300)
 
     return chart.configure_axis(
@@ -212,9 +199,8 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
     """
     左軸：降水確率（棒グラフ / 0〜100%）
     右軸：気温（折れ線グラフ / ℃）
-    を組み合わせた2軸複合グラフを生成する（背景色はなし）。
+    を組み合わせた2軸複合グラフを生成する。
     """
-    # 共通のX軸設定
     x_enc = alt.X(
         "時間:Q",
         title="時間",
@@ -230,7 +216,6 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         ),
     )
 
-    # 左軸：降水確率（棒グラフ）
     bars = (
         alt.Chart(df)
         .mark_bar(color="#4682b4", opacity=0.55, width=18)
@@ -249,7 +234,6 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         )
     )
 
-    # 右軸：気温（折れ線グラフ）
     temp_min = df["気温"].min() if not df.empty else 0
     temp_max = df["気温"].max() if not df.empty else 30
 
@@ -282,7 +266,6 @@ def draw_precip_temp_chart(df: pd.DataFrame) -> alt.Chart:
         )
     )
 
-    # レイヤー結合（背景なし、独立したY軸スケールを適用）
     chart = (
         alt.layer(bars, lines)
         .resolve_scale(y="independent")

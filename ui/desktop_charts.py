@@ -3,7 +3,6 @@ desktop_charts.py
 
 Tkinterアプリケーション（Matplotlib）で使用する海況グラフの描画ヘルパー。
 初回起動時にFigureとCanvasを初期化し、更新時は再利用する。
-エンジン側で算出・保持された制限値（limit_wind, limit_wave）をそのまま活用する。
 """
 
 import matplotlib.pyplot as plt
@@ -12,10 +11,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from engine import SafetyRule, WaveJudge
 
 
-# モジュールロード時に1回だけフォントを設定
 plt.rcParams["font.family"] = "Yu Gothic"
 
-# モジュールレベルのキャッシュ
 _chart_cache = {}
 
 
@@ -38,14 +35,12 @@ def dispose_desktop_graphs():
 def render_all_desktop_graphs(
     wind_tab,
     wave_tab,
-    swell_tab,  # 周期グラフタブ
+    swell_tab,
     tide_tab,
     precip_tab,
     hour_data,
 ):
-    """
-    風速・波高・周期・潮位・降水気温のグラフを指定されたタブ内に一括描画する。
-    """
+    """風速・波高・周期・潮位・降水気温のグラフを指定されたタブ内に一括描画する。"""
     filtered_items = {
         k: v
         for k, v in hour_data.items()
@@ -71,7 +66,6 @@ def render_all_desktop_graphs(
         for v in filtered_items.values()
     ]
 
-    # 周期データのリストを取得（swell_period または swell に対応）
     swells = [
         getattr(v, "swell_period", getattr(v, "swell", 0.0))
         for v in filtered_items.values()
@@ -166,7 +160,7 @@ def render_all_desktop_graphs(
         is_lower_danger=False,
     )
 
-    # --- 4. 潮位グラフ（潮位は下回ると危険なので is_lower_danger=True） ---
+    # --- 4. 潮位グラフ ---
     tide_min = min(tides) if tides else 0
     tide_max = max(tides) if tides else 0
 
@@ -247,7 +241,6 @@ def _update_or_create_single_chart(
 
     ax.clear()
 
-    # 実測・予報データ（基本の折れ線）
     ax.plot(
         hours,
         data,
@@ -256,7 +249,6 @@ def _update_or_create_single_chart(
         linestyle="-",
     )
 
-    # 制限値を超えたポイントを赤い「✖」で強調表示する処理（ラベルなし）
     if threshold is not None:
         if isinstance(threshold, (list, tuple)):
             threshold_list = threshold
@@ -268,12 +260,10 @@ def _update_or_create_single_chart(
 
         for h, val, th in zip(hours, data, threshold_list):
             if is_lower_danger:
-                # 潮位などのように、制限値を「下回ると」危険な場合
                 if val < th:
                     danger_hours.append(h)
                     danger_vals.append(val)
             else:
-                # 風波などのように、制限値を「上回ると」危険な場合
                 if val > th:
                     danger_hours.append(h)
                     danger_vals.append(val)
@@ -289,10 +279,8 @@ def _update_or_create_single_chart(
                 zorder=5,
             )
 
-    # 制限値のラインを描画
     if threshold is not None:
         if isinstance(threshold, (list, tuple)):
-            # 時間ごとに異なる制限値
             ax.plot(
                 hours,
                 threshold,
@@ -302,7 +290,6 @@ def _update_or_create_single_chart(
                 label=threshold_label,
             )
         else:
-            # 固定の制限値
             ax.axhline(
                 y=threshold,
                 color="red",
@@ -402,7 +389,6 @@ def _update_or_create_dual_chart(
     ax1.clear()
     ax2.clear()
 
-    # 左軸：降水確率
     color_precip = "#4682b4"
 
     ax1.set_xlabel("時間")
@@ -439,7 +425,6 @@ def _update_or_create_dual_chart(
         )
     )
 
-    # 右軸：気温
     color_temp = "#ff4500"
 
     ax2.set_ylabel(

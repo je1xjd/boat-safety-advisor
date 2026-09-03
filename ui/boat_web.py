@@ -12,7 +12,6 @@ import sys
 import pandas as pd
 import streamlit as st
 
-# 自作モジュールをインポートするため、親ディレクトリをパスに追加する
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from dataclasses import asdict
@@ -34,7 +33,6 @@ from services.analysis import BoatDataService
 from ui.web_charts import draw_fixed_chart, draw_precip_temp_chart, extract_number
 
 
-# アプリケーションの基本レイアウトとタイトルを設定する
 st.set_page_config(
     page_title="相模川河口 海況安全判定",
     page_icon="🚤",
@@ -43,15 +41,12 @@ st.set_page_config(
 )
 
 
-# セッション状態の初期化が行われていない場合、ホーム画面をデフォルトに設定する
 if "current_page" not in st.session_state:
     st.session_state.current_page = "home"
 
 
 def _create_menu():
-    """
-    アプリケーションのサイドバーメニューを描画・制御する。
-    """
+    """アプリケーションのサイドバーメニューを描画・制御する。"""
     with st.sidebar:
         st.header("≡ メニュー")
 
@@ -98,16 +93,12 @@ def _create_menu():
         st.caption("相模川河口 海況安全判定アプリ")
 
 
-# --- サイドバーメニュー描画の実行 ---
 _create_menu()
 
 
-# --- 関数定義 ---
 @st.cache_data(ttl=600)
 def load_all_data(target_date):
-    """
-    指定された日付の海況解析データを取得する（キャッシュ有効期間: 600秒）。
-    """
+    """指定された日付の海況解析データを取得する（キャッシュ有効期間: 600秒）。"""
     return BoatDataService.get_full_analysis(target_date)
 
 
@@ -123,9 +114,7 @@ def render_summary_card(
     tide_text,
     umi_info,
 ):
-    """
-    判定結果の総合サマリー情報を視覚的なカード形式で描画する。
-    """
+    """判定結果の総合サマリー情報を視覚的なカード形式で描画する。"""
     st.markdown(
         f'<div style="text-align:center; font-size:56px; font-weight:bold; color:{result_color}; padding:10px;">{result_text}</div>',
         unsafe_allow_html=True,
@@ -163,15 +152,12 @@ def render_summary_card(
 
 
 def highlight_status(row):
-    """
-    データフレームの行ごとの判定ステータスに応じて背景色のスタイルを返す。
-    """
+    """データフレームの行ごとの判定ステータスに応じて背景色のスタイルを返す。"""
     return [
         f"background-color: {StatusFormatter.get_status_color(row['判定'])}"
     ] * len(row)
 
 
-# --- ページ定義（データ構造） ---
 CHECKLIST_CONFIG = {
     "pre_lower": ("PRE_LOWER", "下架前チェックリスト"),
     "post_lower": ("POST_LOWER", "下架後チェックリスト"),
@@ -182,9 +168,7 @@ CHECKLIST_CONFIG = {
 
 
 def _render_checklist_page(section_key: str, title: str) -> None:
-    """
-    チェックリストおよび判定基準画面を描画する。
-    """
+    """チェックリストおよび判定基準画面を描画する。"""
     st.title(title)
 
     items = get_rule_content(section_key)
@@ -208,9 +192,7 @@ def _render_checklist_page(section_key: str, title: str) -> None:
 
 
 def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
-    """
-    判定結果のデータフレームと各種グラフを表示するタブUIエリアを構築する。
-    """
+    """判定結果のデータフレームと各種グラフを表示するタブUIエリアを構築する。"""
     tab1, tab_wind, tab_wave, tab_swell, tab_tide, tab_precip_temp = st.tabs(
         ["📊 判定結果", "🍃 風速", "🌊 波高", "〰️ 周期", "🚢 潮位", "🌧 降水・気温"]
     )
@@ -310,7 +292,6 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
         )
 
 
-# --- ページごとの表示制御 ---
 if st.session_state.current_page in CHECKLIST_CONFIG:
     section_key, title = CHECKLIST_CONFIG[st.session_state.current_page]
 
@@ -396,9 +377,6 @@ elif st.session_state.current_page == "home":
             low_tides,
         )
 
-        # ---------------------------------------------------------
-        # 判定結果テーブル
-        # ---------------------------------------------------------
         table_rows = SafetyReportFormatter.build_table_rows(
             result.hour_data,
             sunrise_time,
@@ -429,9 +407,6 @@ elif st.session_state.current_page == "home":
             }
         )
 
-        # ---------------------------------------------------------
-        # グラフ用データ
-        # ---------------------------------------------------------
         graph_data_list = []
 
         for k, v in result.hour_data.items():
@@ -493,8 +468,6 @@ elif st.session_state.current_page == "home":
                         else 20.0
                     ),
                     "判定": status_str,
-
-                    # 各種制限値
                     "制限風速": getattr(
                         v,
                         "limit_wind",

@@ -78,9 +78,7 @@ class BoatSafetyApp:
         self._create_graph_area()
 
     def _create_header_area(self):
-        """
-        ヘッダー部分のUI部品を作成する。
-        """
+        """ヘッダー部分のUI部品を作成する。"""
         header = tk.Frame(self.root, bg="#0b4f6c", height=65)
         header.pack(fill="x")
 
@@ -115,9 +113,7 @@ class BoatSafetyApp:
         ).pack(pady=(5, 5))
 
     def _create_date_area(self):
-        """
-        判定日の選択および実行ボタン部分のUIを作成する。
-        """
+        """判定日の選択および実行ボタン部分のUIを作成する。"""
         weekdays = ["月", "火", "水", "木", "金", "土", "日"]
         date_frame = tk.LabelFrame(
             self.root, text=" 判定日 ", bg="white", padx=10, pady=5
@@ -153,9 +149,7 @@ class BoatSafetyApp:
         self.submit_btn.pack(pady=12)
 
     def _create_result_area(self):
-        """
-        判定結果のサマリーパネルおよび潮位情報部分を作成する。
-        """
+        """判定結果のサマリーパネルおよび潮位情報部分を作成する。"""
         status_panel = tk.Frame(self.root, bg="white", bd=1, relief="solid")
         status_panel.pack(fill="x", padx=20, pady=5)
 
@@ -194,9 +188,7 @@ class BoatSafetyApp:
         self.tide_info_label.pack(pady=2)
 
     def _create_graph_area(self):
-        """
-        詳細データおよび各種グラフを表示するタブ・ツリービュー領域を作成する。
-        """
+        """詳細データおよび各種グラフを表示するタブ・ツリービュー領域を作成する。"""
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True, padx=20, pady=(5, 15))
 
@@ -343,7 +335,7 @@ class BoatSafetyApp:
                         row.direction,
                         row.wind,
                         row.wave,
-                        row.swell,  # 💡 修正済み: 正しく周期データを渡す
+                        row.swell,
                         row.tide,
                         row.precip,
                         row.temp,
@@ -351,7 +343,6 @@ class BoatSafetyApp:
                     tags=(row.tag,),
                 )
 
-            # 💡 修正済み: 周期グラフタブ (self.swell_tab) を引数に追加
             render_all_desktop_graphs(
                 self.wind_tab, 
                 self.wave_tab, 
@@ -377,9 +368,7 @@ class BoatSafetyApp:
         )
 
     def show_menu_popup(self):
-        """
-        メイン画面右上のハンバーガーメニューからポップアップメニューを表示する。
-        """
+        """メイン画面右上のハンバーガーメニューからポップアップメニューを表示する。"""
         menu = tk.Menu(self.root, tearoff=0, font=("Yu Gothic UI", 10))
 
         menu.add_command(label="⚖ 判定基準", command=self._show_safety_criteria)
@@ -416,9 +405,7 @@ class BoatSafetyApp:
     def _create_checklist_widgets(
         self, top, listbox, scrollbar, items, is_criteria=False
     ):
-        """
-        チェックリストおよび判定基準画面のUI部品を配置・構築するために処理をまとめる。
-        """
+        """チェックリストおよび判定基準画面のUI部品を配置・構築するために処理をまとめる。"""
         tk.Button(
             top,
             text="閉じる",
@@ -493,9 +480,7 @@ class BoatSafetyApp:
 
 
 def run_boat_desktop():
-    """
-    デスクトップアプリケーションを起動するエントリポイント。
-    """
+    """デスクトップアプリケーションを起動するエントリポイント。"""
     main_window = tk.Tk()
     app = BoatSafetyApp(main_window)
     main_window.mainloop()
