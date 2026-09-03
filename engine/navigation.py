@@ -39,7 +39,6 @@ class NavigationAnalyzer:
             if hour >= max_len or hour >= len(tide_data):
                 continue
 
-            # 1時間ごとのデータを抽出・判定して格納
             hour_data[hour] = cls._build_single_hour_forecast(
                 hour, weather_info, tide_data, high_tides, low_tides
             )
@@ -108,8 +107,23 @@ class NavigationAnalyzer:
         )
 
     @classmethod
-    def build_navigation_summary(cls, hour_data) -> AnalysisSummary:
+    def build_navigation_summary(cls, hour_data, umi_info=None) -> AnalysisSummary:
         """航行可能な時間帯を抽出し、総合的な分析サマリーを作成する。"""
+
+        # 算出前に apply_sequence_rules を実行して日出入フラグを確実に反映させる
+        if umi_info is not None:
+            from .utils import SunCalculator
+            sunrise_time, sunset_time = SunCalculator.get_sun_times(umi_info)
+            high_tides = getattr(umi_info, "high_tides", getattr(umi_info, "high_tide_list", []))
+            low_tides = getattr(umi_info, "low_tides", getattr(umi_info, "low_tide_list", []))
+            
+            BoatSafetyEngine.apply_sequence_rules(
+                hour_data,
+                sunrise_time,
+                sunset_time,
+                high_tides,
+                low_tides,
+            )
 
         valid_windows, before_c, after_c = BoatSafetyEngine.calculate_valid_windows(
             hour_data
@@ -129,3 +143,4 @@ class NavigationAnalyzer:
             before_str=before_str,
             after_str=after_str,
         )
+

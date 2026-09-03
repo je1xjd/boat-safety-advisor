@@ -47,7 +47,6 @@ class SafetyRule:
     TIDE_COLOR: str = "#2ca02c"
     SWELL_COLOR: str = "#20b2aa"
 
-
     TIDE_STATION_CODE: str = "D8"
     JMA_TIDE_BASE_URL: str = "https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt"
     UMITENKI_BASE_URL: str = "https://www.umitenki.jp/tenki/1545/14days"

@@ -93,14 +93,21 @@ class BoatSafetyEngine:
         """航行可能な時間帯の候補を算出し、潮位による制約でフィルタリングする。"""
         valid_windows = []
 
-        for start_hour in range(
-            SafetyRule.ACTIVITY_START_HOUR,
-            SafetyRule.ACTIVITY_END_HOUR + 1,
-        ):
+        hours = sorted(hour_data.keys())
+        if not hours:
+            return [], [], []
+
+        min_hour = min(hours)
+        max_hour = max(hours)
+
+        for start_hour in range(min_hour, max_hour + 1):
             for end_hour in range(
                 start_hour + SafetyRule.REQUIRED_SAFE_HOURS,
-                SafetyRule.ACTIVITY_END_HOUR + 1,
+                max_hour + 1,
             ):
+                if start_hour not in hour_data or end_hour not in hour_data:
+                    continue
+
                 if not (
                     hour_data[start_hour].is_safe
                     and hour_data[end_hour].is_safe
@@ -175,7 +182,18 @@ class BoatSafetyEngine:
         sunset_time: datetime.time | None,
     ) -> tuple[str, str]:
         """UI表示用の海況ステータスとカラーカテゴリを返す。"""
-        if SafetyRule.ACTIVITY_START_HOUR <= hour <= SafetyRule.ACTIVITY_END_HOUR:
+        target_time = datetime.time(hour, 0)
+        
+        if sunrise_time is not None and sunset_time is not None:
+            is_time_ok = sunrise_time <= target_time < sunset_time
+            is_before_sunrise = target_time < sunrise_time
+            is_after_sunset = target_time >= sunset_time
+        else:
+            is_time_ok = SafetyRule.ACTIVITY_START_HOUR <= hour <= SafetyRule.ACTIVITY_END_HOUR
+            is_before_sunrise = hour < SafetyRule.ACTIVITY_START_HOUR
+            is_after_sunset = hour > SafetyRule.ACTIVITY_END_HOUR
+
+        if is_time_ok:
             if data.is_safe:
                 return "安全", "safe"
 
@@ -184,10 +202,12 @@ class BoatSafetyEngine:
 
             return "危険", "danger"
 
-        return (
-            "日没" if hour > SafetyRule.ACTIVITY_END_HOUR else "夜明",
-            "danger",
-        )
+        if is_before_sunrise:
+            return "夜明", "danger"
+        elif is_after_sunset:
+            return "日没", "danger"
+
+        return "危険", "danger"
 
     @classmethod
     def _get_longest_window(cls, windows: list) -> tuple:
@@ -253,7 +273,6 @@ class BoatSafetyEngine:
         for hour in hours:
             data = hour_data[hour]
 
-            # 各時間の制限波高・制限風速を算出して保持する
             if high_tides is not None and low_tides is not None:
                 is_south = WindJudge.is_south_wind(
                     getattr(data, "wind_dir", 0)
@@ -281,7 +300,6 @@ class BoatSafetyEngine:
                 data.limit_wave = limit_wave
                 data.limit_wind = limit_wind
 
-                # 動的制限値を反映して wind_wave_safe を更新する
                 wind_speed = getattr(data, "wind_speed", 0)
                 wave_height = getattr(data, "wave_height", 0)
                 swell_period = getattr(data, "swell_period", getattr(data, "swell", 0.0))
@@ -314,6 +332,11 @@ class BoatSafetyEngine:
             data.is_safe = (
                 is_time_ok
                 and data.wind_wave_safe
+            )
+
+            # is_safe の更新に合わせて is_navigable の整合性を持たせる
+            data.is_navigable = data.is_safe or (
+                getattr(data, "wind_wave_safe", False) and data.is_tide_low()
             )
 
             data.is_tide_warning = False

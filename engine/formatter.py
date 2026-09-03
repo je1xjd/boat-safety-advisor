@@ -81,7 +81,7 @@ class SafetyReportFormatter:
         sunrise_time: datetime.time | None,
         sunset_time: datetime.time | None,
     ) -> list:
-        """気象データに基づき、テーブル表示用の行データを生成する（分単位の日出入対応）。"""
+        """気象データに基づき、テーブル表示用の行データを生成する。"""
         BoatSafetyEngine.apply_sequence_rules(hour_data, sunrise_time, sunset_time)
 
         rows = []
@@ -103,7 +103,6 @@ class SafetyReportFormatter:
             hour, data, sunrise_time, sunset_time
         )
 
-        # 各種気象・海象データのフォーマット（統一された記述）
         wind_text = (
             f"{data.wind_speed:.1f}m/s"
             if getattr(data, "wind_speed", None) is not None
@@ -116,7 +115,7 @@ class SafetyReportFormatter:
         )
         swell_text = (
             f"{getattr(data, 'swell_period', getattr(data, 'swell', None)):.1f}s"
-            if getattr(data, "swell_period", getattr(data, 'swell', None)) is not None
+            if getattr(data, 'swell_period', getattr(data, 'swell', None)) is not None
             else "取得失敗"
         )
         tide_text = (
@@ -212,10 +211,7 @@ class ReportFormatter:
 
     @staticmethod
     def filter_display_rows(rows: list[UIRow]) -> list[UIRow]:
-        """
-        18時（17-18時）までのデータのみに絞り込む。
-        要件: 7-8時から17-18時までの11行のみを返す。
-        """
+        """18時までのデータのみに絞り込む。"""
         return [
             row
             for row in rows

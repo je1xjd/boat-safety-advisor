@@ -38,7 +38,7 @@ class WindWaveEvaluator:
             else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
         )
 
-        # グラフ側の制限波高ライン（赤線）を超えている場合は、問答無用で危険（False）とする
+        # 制限波高を超える場合は危険（False）とする
         if wave_height > limit_wave:
             return False
 
