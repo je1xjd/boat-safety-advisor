@@ -39,7 +39,8 @@ class BoatDataService:
             weather_info, tide_result, high_tides, low_tides
         )
 
-        summary = NavigationAnalyzer.build_navigation_summary(hour_data)
+        # umi_info を渡して、サマリー計算前に日出入ルールを確実に反映させる
+        summary = NavigationAnalyzer.build_navigation_summary(hour_data, umi_info)
 
         return AnalysisResult(
             hour_data=hour_data,
