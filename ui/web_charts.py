@@ -9,7 +9,7 @@ import re
 import altair as alt
 import pandas as pd
 
-from engine import SafetyRule
+from engine import SafetyRule, get_wind_arrow
 
 
 def extract_number(val: str | float) -> float:
@@ -95,6 +95,30 @@ def draw_fixed_chart(
     )
 
     layers = [line]
+
+    # 風速グラフの場合、Web版向けのカラー絵文字付き風向矢印レイヤーを追加する
+    if y_col in ["風速", "wind"] and "風向" in df.columns:
+        df_arrow = df.copy()
+        # Web版では use_emoji=True を明示してカラー絵文字の矢印を取得
+        df_arrow["_arrow"] = df_arrow["風向"].apply(
+            lambda x: get_wind_arrow(x, use_emoji=True) if pd.notna(x) else ""
+        )
+        df_arrow["_arrow_y"] = df_arrow[y_col] + 0.6
+
+        arrow_layer = (
+            alt.Chart(df_arrow)
+            .mark_text(align="center", baseline="bottom", fontSize=14, color="#333333")
+            .encode(
+                x="時間:Q",
+                y="_arrow_y:Q",
+                text="_arrow:N",
+                tooltip=[
+                    alt.Tooltip("時間:Q", title="時間", format="d"),
+                    alt.Tooltip("風向:N", title="風向"),
+                ]
+            )
+        )
+        layers.append(arrow_layer)
 
     if limit_val is not None:
         label_text = limit_label or "制限値"

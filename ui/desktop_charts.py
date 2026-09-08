@@ -8,7 +8,7 @@ Tkinterアプリケーション（Matplotlib）で使用する海況グラフの
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from engine import SafetyRule, WaveJudge
+from engine import SafetyRule, WaveJudge, get_wind_arrow
 
 
 plt.rcParams["font.family"] = "Yu Gothic"
@@ -30,6 +30,37 @@ def dispose_desktop_graphs():
             pass
 
     _chart_cache.clear()
+
+
+def _extract_wind_direction(v) -> str:
+    """
+    データ構造（オブジェクトまたは辞書）や属性名の違いに依存せず、
+    風向を表す文字列を堅牢に抽出する。
+    """
+    candidates = [
+        "wind_direction_text",
+        "direction",
+        "wind_direction",
+        "wind_dir",
+        "dir",
+    ]
+
+    for key in candidates:
+        val = getattr(v, key, None)
+        if val is not None and str(val).strip() != "":
+            return str(val)
+
+    if isinstance(v, dict):
+        for key in candidates:
+            if key in v and v[key] is not None and str(v[key]).strip() != "":
+                return str(v[key])
+
+    if hasattr(v, "__dict__"):
+        for attr_name, val in v.__dict__.items():
+            if any(term in attr_name.lower() for term in ["direction", "dir"]) and val:
+                return str(val)
+
+    return ""
 
 
 def render_all_desktop_graphs(
@@ -99,6 +130,11 @@ def render_all_desktop_graphs(
     wind_data_max = max(winds) if winds else 0
     wind_dynamic_top = max(wind_limit_max * 2.0, wind_data_max * 1.1)
 
+    wind_directions = [
+        _extract_wind_direction(v)
+        for v in filtered_items.values()
+    ]
+
     _update_or_create_single_chart(
         wind_tab,
         "wind",
@@ -111,6 +147,7 @@ def render_all_desktop_graphs(
         threshold_label="制限風速",
         y_min=0,
         is_lower_danger=False,
+        directions=wind_directions,
     )
 
     # --- 2. 波高グラフ ---
@@ -207,6 +244,7 @@ def _update_or_create_single_chart(
     threshold_label=None,
     y_min=0,
     is_lower_danger=False,
+    directions=None,
 ):
     """単一軸グラフを初回作成または再利用して描画する。"""
     if (
@@ -248,6 +286,22 @@ def _update_or_create_single_chart(
         marker="o",
         linestyle="-",
     )
+
+    # ★デスクトップ版向けに use_emoji=False を指定し、制御文字を含まないテキスト矢印を取得して描画する
+    if directions and key == "wind":
+        for h, val, d_text in zip(hours, data, directions):
+            if d_text is not None and str(d_text).strip() != "":
+                arrow = get_wind_arrow(d_text, use_emoji=False)
+                ax.text(
+                    h,
+                    val + 0.6,
+                    arrow,
+                    ha="center",
+                    va="bottom",
+                    fontsize=14,
+                    color="#333333",
+                    weight="bold",  # 視認性を上げるために太字を設定
+                )
 
     if threshold is not None:
         if isinstance(threshold, (list, tuple)):
@@ -321,7 +375,7 @@ def _update_or_create_single_chart(
 
     ax.set_ylim(
         y_min,
-        y_lim,
+        y_lim + 1.5,
     )
 
     ax.grid(

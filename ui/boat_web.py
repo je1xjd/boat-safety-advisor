@@ -28,7 +28,7 @@ from engine.formatter import (
     TideFormatter,
 )
 from engine.loader import get_rule_content
-from engine.utils import SunCalculator, summarize_daytime_weather
+from engine.utils import SunCalculator, summarize_daytime_weather, get_wind_arrow
 from services.analysis import BoatDataService
 from ui.web_charts import draw_fixed_chart, draw_precip_temp_chart, extract_number
 
@@ -46,7 +46,7 @@ if "current_page" not in st.session_state:
 
 
 def _create_menu():
-    """アプリケーションのサイドバーメニューを描画・制御する。"""
+    """アプリケーションのサイドバーメニューを描画・制御する[cite: 9]。"""
     with st.sidebar:
         st.header("≡ メニュー")
 
@@ -98,7 +98,7 @@ _create_menu()
 
 @st.cache_data(ttl=600)
 def load_all_data(target_date):
-    """指定された日付の海況解析データを取得する（キャッシュ有効期間: 600秒）。"""
+    """指定された日付の海況解析データを取得する（キャッシュ有効期間: 600秒）[cite: 9]。"""
     return BoatDataService.get_full_analysis(target_date)
 
 
@@ -114,7 +114,7 @@ def render_summary_card(
     tide_text,
     umi_info,
 ):
-    """判定結果の総合サマリー情報を視覚的なカード形式で描画する。"""
+    """判定結果の総合サマリー情報を視覚的なカード形式で描画する[cite: 9]。"""
     st.markdown(
         f'<div style="text-align:center; font-size:56px; font-weight:bold; color:{result_color}; padding:10px;">{result_text}</div>',
         unsafe_allow_html=True,
@@ -152,7 +152,7 @@ def render_summary_card(
 
 
 def highlight_status(row):
-    """データフレームの行ごとの判定ステータスに応じて背景色のスタイルを返す。"""
+    """データフレームの行ごとの判定ステータスに応じて背景色のスタイルを返す[cite: 9]。"""
     return [
         f"background-color: {StatusFormatter.get_status_color(row['判定'])}"
     ] * len(row)
@@ -168,7 +168,7 @@ CHECKLIST_CONFIG = {
 
 
 def _render_checklist_page(section_key: str, title: str) -> None:
-    """チェックリストおよび判定基準画面を描画する。"""
+    """チェックリストおよび判定基準画面を描画する[cite: 9]。"""
     st.title(title)
 
     items = get_rule_content(section_key)
@@ -192,7 +192,7 @@ def _render_checklist_page(section_key: str, title: str) -> None:
 
 
 def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
-    """判定結果のデータフレームと各種グラフを表示するタブUIエリアを構築する。"""
+    """判定結果のデータフレームと各種グラフを表示するタブUIエリアを構築する[cite: 9]。"""
     tab1, tab_wind, tab_wave, tab_swell, tab_tide, tab_precip_temp = st.tabs(
         ["📊 判定結果", "🍃 風速", "🌊 波高", "〰️ 周期", "🚢 潮位", "🌧 降水・気温"]
     )
@@ -220,6 +220,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
     with tab_wind:
         st.subheader("風速 (m/s)")
 
+        # グラフ内に矢印が表示されるため、下部の個別の列描画部分は削除しました[cite: 9]
         st.altair_chart(
             draw_fixed_chart(
                 df_graph,
@@ -300,7 +301,7 @@ if st.session_state.current_page in CHECKLIST_CONFIG:
 elif st.session_state.current_page == "home":
     st.title("🚤 ボート出港判定")
     st.caption(
-        "相模川河口の潮位・潮汐・風速・風向・波高・うねりを総合評価"
+        "相模川河口の潮位・潮汐・風速・風向・波高・うねりを総合評価[cite: 9]"
     )
 
     JST = datetime.timezone(datetime.timedelta(hours=9), "JST")
@@ -444,6 +445,7 @@ elif st.session_state.current_page == "home":
             graph_data_list.append(
                 {
                     "時間": int(k),
+                    "風向": getattr(v, "dir_kanji", "-"),
                     "風速": (
                         v.wind_speed
                         if v.wind_speed is not None
