@@ -19,6 +19,6 @@ from .models import (
 from .navigation import NavigationAnalyzer
 from .rules import SafetyRule
 from .tide import TideJudge
-from .utils import SunCalculator, summarize_daytime_weather
+from .utils import SunCalculator, summarize_daytime_weather, get_wind_arrow
 from .wave import WaveJudge
 from .wind import WindJudge

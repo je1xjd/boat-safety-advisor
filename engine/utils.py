@@ -111,3 +111,51 @@ class SunCalculator:
                 pass
 
         return sunrise_time, sunset_time
+
+
+def get_wind_arrow(direction_input, use_emoji: bool = True) -> str:
+    """
+    風向の文字列、または角度（数値）を8〜16方向の進行方向矢印に変換する共通関数（風の抜ける向き）
+    :param direction_input: 風向の文字列または数値（角度）
+    :param use_emoji: Trueならカラー絵文字（Web版向け）、Falseなら制御文字を含まないプレーンな矢印（デスクトップ版向け）
+    """
+    # 数値（角度）で渡された場合は、16方位の文字列に変換する
+    try:
+        deg = float(direction_input) % 360
+        directions_16 = [
+            "北", "北北東", "北東", "東北東",
+            "東", "東南東", "南東", "南南東",
+            "南", "南南西", "南西", "西南西",
+            "西", "西北西", "北西", "北北西"
+        ]
+        idx = int((deg + 11.25) // 22.5) % 16
+        d = directions_16[idx]
+    except (ValueError, TypeError):
+        d = str(direction_input)
+    
+    # 複合方位（北西、北東、南東、南西系）の判定
+    if "北北西" in d or "西北西" in d or "北西" in d:
+        arrow = "↘️"
+    elif "北北東" in d or "東北東" in d or "北東" in d:
+        arrow = "↙️"
+    elif "南南東" in d or "東南東" in d or "南東" in d:
+        arrow = "↖️"
+    elif "南南西" in d or "西南西" in d or "南西" in d:
+        arrow = "↗️"
+    # 基本の4方位
+    elif "北" in d:
+        arrow = "⬇️"
+    elif "南" in d:
+        arrow = "⬆️"
+    elif "東" in d:
+        arrow = "⬅️"
+    elif "西" in d:
+        arrow = "➡️"
+    else:
+        arrow = "・"
+    
+    # デスクトップ版などでプレーンなテキスト記号にしたい場合は、異体字セレクタ（\ufe0f）を除去する
+    if not use_emoji:
+        arrow = arrow.replace("\ufe0f", "")
+        
+    return arrow
