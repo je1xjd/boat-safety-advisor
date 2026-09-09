@@ -375,7 +375,7 @@ def _update_or_create_single_chart(
 
     ax.set_ylim(
         y_min,
-        y_lim + 1.5,
+        y_lim,
     )
 
     ax.grid(
