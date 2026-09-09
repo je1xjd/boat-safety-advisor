@@ -300,9 +300,6 @@ if st.session_state.current_page in CHECKLIST_CONFIG:
 
 elif st.session_state.current_page == "home":
     st.title("🚤 ボート出港判定")
-    st.caption(
-        "相模川河口の潮位・潮汐・風速・風向・波高・うねりを総合評価[cite: 9]"
-    )
 
     JST = datetime.timezone(datetime.timedelta(hours=9), "JST")
     today_jst = datetime.datetime.now(JST).date()

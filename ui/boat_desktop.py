@@ -104,13 +104,6 @@ class BoatSafetyApp:
         )
         self.menu_btn.pack(side="right", padx=15)
 
-        tk.Label(
-            self.root,
-            text="※相模川河口の潮位・潮汐・風速・風向・波高・うねりを総合評価",
-            bg="#eef3f8",
-            fg="#555555",
-            font=("Yu Gothic UI", 9, "italic"),
-        ).pack(pady=(5, 5))
 
     def _create_date_area(self):
         """判定日の選択および実行ボタン部分のUIを作成する。"""
