@@ -38,10 +38,6 @@ class SafetyRule:
     WIND_OVERRIDE_MARGIN: float = 1.0
     WIND_OVERRIDE_WAVE_HEIGHT: float = 0.4
 
-    WIND_Y_LIMIT = 15
-    WAVE_Y_LIMIT = 3
-    TIDE_Y_LIMIT = 200
-
     WIND_COLOR: str = "#1f77b4"
     WAVE_COLOR: str = "#3b5998"
     TIDE_COLOR: str = "#2ca02c"
