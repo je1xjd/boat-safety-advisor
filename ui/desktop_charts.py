@@ -5,6 +5,7 @@ Tkinterアプリケーション（Matplotlib）で使用する海況グラフの
 初回起動時にFigureとCanvasを初期化し、更新時は再利用する。
 """
 
+import math
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -30,6 +31,24 @@ def dispose_desktop_graphs():
             pass
 
     _chart_cache.clear()
+
+
+def _calculate_nice_upper_limit(lim_max: float) -> float:
+    """制限値の約2倍をベースに、グラフの目盛りが綺麗になるキリの良い上限値を算出する。"""
+    if lim_max <= 0:
+        return 10.0
+    
+    double_lim = lim_max * 2.0
+    
+    # 規模感に応じてキリの良い単位（ステップ）で切り上げる
+    if double_lim <= 5:
+        return math.ceil(double_lim * 2) / 2  # 0.5刻み (例: 1.6 -> 2.0)
+    elif double_lim <= 20:
+        return math.ceil(double_lim / 5) * 5   # 5刻み (例: 11 -> 15, 18 -> 20)
+    elif double_lim <= 100:
+        return math.ceil(double_lim / 10) * 10 # 10刻み
+    else:
+        return math.ceil(double_lim / 50) * 50 # 50刻み (例: 70×2=140 -> 150)
 
 
 def _extract_wind_direction(v) -> str:
@@ -128,7 +147,10 @@ def render_all_desktop_graphs(
     ]
     wind_limit_max = max(wind_limits) if wind_limits else SafetyRule.WIND_LIMIT_NORMAL
     wind_data_max = max(winds) if winds else 0
-    wind_dynamic_top = max(wind_limit_max * 2.0, wind_data_max * 1.1)
+    
+    # 制限値ベースのキリの良い2倍値を計算し、データ超過時はダイナミックに拡張
+    wind_base_top = _calculate_nice_upper_limit(wind_limit_max)
+    wind_dynamic_top = max(wind_base_top, wind_data_max * 1.1)
 
     wind_directions = [
         _extract_wind_direction(v)
@@ -157,7 +179,9 @@ def render_all_desktop_graphs(
     ]
     wave_limit_max = max(wave_limits) if wave_limits else SafetyRule.MAX_WAVE_HEIGHT_NORMAL
     wave_data_max = max(waves) if waves else 0
-    wave_dynamic_top = max(wave_limit_max * 2.0, wave_data_max * 1.1)
+    
+    wave_base_top = _calculate_nice_upper_limit(wave_limit_max)
+    wave_dynamic_top = max(wave_base_top, wave_data_max * 1.1)
 
     _update_or_create_single_chart(
         wave_tab,
@@ -181,7 +205,8 @@ def render_all_desktop_graphs(
     swell_limit_max = max(swell_limits) if swell_limits else SafetyRule.MAX_SWELL_PERIOD
     swell_data_max = max(swells) if swells else 0
     
-    swell_dynamic_top = max(swell_limit_max * 2.0, swell_data_max * 1.1, 15.0)
+    swell_base_top = _calculate_nice_upper_limit(swell_limit_max)
+    swell_dynamic_top = max(swell_base_top, swell_data_max * 1.1)
 
     _update_or_create_single_chart(
         swell_tab,
@@ -206,7 +231,10 @@ def render_all_desktop_graphs(
         if tide_min < 0
         else 0
     )
-    tide_ylim_top = max(SafetyRule.TIDE_Y_LIMIT, tide_max * 1.1)
+    
+    # 最低潮位（70cm）からキリの良い上限値（150）を算出、データ超過時は拡張
+    tide_base_top = _calculate_nice_upper_limit(SafetyRule.MIN_TIDE_CM)
+    tide_ylim_top = max(tide_base_top, tide_max * 1.1)
 
     _update_or_create_single_chart(
         tide_tab,
@@ -287,7 +315,6 @@ def _update_or_create_single_chart(
         linestyle="-",
     )
 
-    # ★デスクトップ版向けに use_emoji=False を指定し、制御文字を含まないテキスト矢印を取得して描画する
     if directions and key == "wind":
         for h, val, d_text in zip(hours, data, directions):
             if d_text is not None and str(d_text).strip() != "":
@@ -300,7 +327,7 @@ def _update_or_create_single_chart(
                     va="bottom",
                     fontsize=14,
                     color="#333333",
-                    weight="bold",  # 視認性を上げるために太字を設定
+                    weight="bold",
                 )
 
     if threshold is not None:

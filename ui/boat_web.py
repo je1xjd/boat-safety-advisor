@@ -278,7 +278,7 @@ def _create_graph_tabs(df: pd.DataFrame, df_graph: pd.DataFrame) -> None:
                 SafetyRule.TIDE_COLOR,
                 limit_val="制限潮位",
                 limit_label="最低潮位",
-                y_max=SafetyRule.TIDE_Y_LIMIT,
+                y_max=None,
                 y_min=y_min_val,
             ),
             width="stretch",

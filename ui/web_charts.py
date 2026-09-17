@@ -4,6 +4,7 @@ web_charts.py
 StreamlitのWeb版で使用するAltairグラフの描画および数値抽出ヘルパー。
 """
 
+import math
 import re
 
 import altair as alt
@@ -16,6 +17,24 @@ def extract_number(val: str | float) -> float:
     """文字列や数値から最初の数値を抽出する。"""
     m = re.search(r"(-?\d+(?:\.\d+)?)", str(val))
     return float(m.group(1)) if m else 0.0
+
+
+def _calculate_nice_upper_limit(lim_max: float) -> float:
+    """制限値の約2倍をベースに、グラフの目盛りが綺麗になるキリの良い上限値を算出する。"""
+    if lim_max <= 0:
+        return 10.0
+    
+    double_lim = lim_max * 2.0
+    
+    # 規模感に応じてキリの良い単位（ステップ）で切り上げる
+    if double_lim <= 5:
+        return math.ceil(double_lim * 2) / 2  # 0.5刻み (例: 1.6 -> 2.0)
+    elif double_lim <= 20:
+        return math.ceil(double_lim / 5) * 5   # 5刻み (例: 11 -> 15, 18 -> 20)
+    elif double_lim <= 100:
+        return math.ceil(double_lim / 10) * 10 # 10刻み
+    else:
+        return math.ceil(double_lim / 50) * 50 # 50刻み (例: 70×2=140 -> 150)
 
 
 def draw_fixed_chart(
@@ -40,8 +59,10 @@ def draw_fixed_chart(
     elif limit_val is not None:
         lim_max = float(limit_val)
 
+    # 制限値からキリの良い2倍のデフォルト上限を算出し、データ超過時はダイナミックに拡張
     if lim_max > 0:
-        calculated_max = max(lim_max * 2.0, data_max * 1.1)
+        base_limit_top = _calculate_nice_upper_limit(lim_max)
+        calculated_max = max(base_limit_top, data_max * 1.1)
     else:
         calculated_max = max(data_max * 1.1, 10.0)
 
