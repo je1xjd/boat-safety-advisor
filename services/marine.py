@@ -286,6 +286,7 @@ class MarineWeatherClient:
     def get_umitenki_tide_info(target_date: date) -> UmiInfo:
         """
         海天気.jpから情報を取得し、パースして結果を返す[cite: 3]。
+        障害時や接続失敗時はアプリが落ちないようフォールバック（空のUmiInfo）を返す。
 
         Parameters:
             target_date (date): 取得対象日
@@ -293,5 +294,12 @@ class MarineWeatherClient:
         Returns:
             UmiInfo: 潮汐・日出没などの海洋情報オブジェクト
         """
-        html_text = WeatherAPI.fetch_text(SafetyRule.UMITENKI_BASE_URL)
-        return WeatherScraper.parse_umitenki_html(html_text, target_date)
+        try:
+            html_text = WeatherAPI.fetch_text(SafetyRule.UMITENKI_BASE_URL)
+            if not html_text:
+                raise ValueError("取得したHTMLが空です")
+            return WeatherScraper.parse_umitenki_html(html_text, target_date)
+        except Exception as e:
+            logger.warning(f"海天気.jpからのデータ取得・パースに失敗しました（障害の可能性）: {e}")
+            # アプリがクラッシュしないよう、デフォルト（空）のUmiInfoを返す
+            return UmiInfo()
