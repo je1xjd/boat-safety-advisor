@@ -82,7 +82,7 @@ class MarineWeatherClient:
         session = requests.Session()
         session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BoatSafetyClient/3.0"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             }
         )
 
@@ -285,8 +285,7 @@ class MarineWeatherClient:
     @staticmethod
     def get_umitenki_tide_info(target_date: date) -> UmiInfo:
         """
-        海天気.jpから情報を取得し、パースして結果を返す[cite: 3]。
-        障害時や接続失敗時はアプリが落ちないようフォールバック（空のUmiInfo）を返す。
+        海天気.jpから情報を取得し、パースして結果を返す。
 
         Parameters:
             target_date (date): 取得対象日
@@ -294,12 +293,13 @@ class MarineWeatherClient:
         Returns:
             UmiInfo: 潮汐・日出没などの海洋情報オブジェクト
         """
+        html_text = ""
         try:
-            html_text = WeatherAPI.fetch_text(SafetyRule.UMITENKI_BASE_URL)
-            if not html_text:
-                raise ValueError("取得したHTMLが空です")
-            return WeatherScraper.parse_umitenki_html(html_text, target_date)
+            # 共通の堅牢なセッション（User-Agent付き）を使用してリクエストを送る
+            response = MarineWeatherClient.get_session().get(SafetyRule.UMITENKI_BASE_URL, timeout=10)
+            response.raise_for_status()
+            html_text = response.text
         except Exception as e:
-            logger.warning(f"海天気.jpからのデータ取得・パースに失敗しました（障害の可能性）: {e}")
-            # アプリがクラッシュしないよう、デフォルト（空）のUmiInfoを返す
-            return UmiInfo()
+            logger.error(f"海天気.jpからのHTML取得に失敗しました: {e}")
+
+        return WeatherScraper.parse_umitenki_html(html_text, target_date)
